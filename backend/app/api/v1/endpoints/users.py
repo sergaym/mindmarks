@@ -1,3 +1,6 @@
+from fastapi import APIRouter, Depends, HTTPException, status
+from typing import List
+from uuid import UUID
 
 from app.api.v1.deps import get_current_active_superuser, get_current_user
 from app.api.v1.schemas.user import UserRead, UserUpdate
@@ -57,3 +60,36 @@ def update_user_me(
     
     # If no changes or update failed, return current user
     return UserRead.from_orm(current_user)
+
+
+@router.get("", response_model=List[UserRead])
+def read_users(
+    db: DBSession,
+    skip: int = 0,
+    limit: int = 100,
+    current_user: User = Depends(get_current_active_superuser),
+):
+    """
+    Retrieve users - superuser only
+    """
+    users = user_service.get_users(db, skip, limit)
+    return [UserRead.from_orm(user) for user in users]
+
+
+@router.get("/{user_id}", response_model=UserRead)
+def read_user_by_id(
+    user_id: UUID,
+    db: DBSession,
+    current_user: User = Depends(get_current_active_superuser),
+):
+    """
+    Get a specific user by id - superuser only
+    """
+    user = user_service.get_user_by_id(db, user_id)
+    
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="User not found"
+        )
+    
+    return UserRead.from_orm(user) 

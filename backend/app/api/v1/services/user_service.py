@@ -1,6 +1,6 @@
 import logging
 import uuid
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Union
 from uuid import UUID
 from sqlalchemy.orm import Session
 from sqlalchemy import or_
@@ -52,14 +52,19 @@ def create_user(db: Session, user_in: UserCreate) -> User:
     return user
 
 
-def update_user(db: Session, user_id: UUID, user_in: UserUpdate) -> Optional[User]:
+def update_user(db: Session, user_id: UUID, user_in: Union[UserUpdate, Dict]) -> Optional[User]:
     """Update a user"""
     user = get_user_by_id(db, user_id)
     if not user:
         return None
     
     # Update user fields
-    update_data = user_in.dict(exclude_unset=True)
+    if hasattr(user_in, 'dict'):
+        # It's a Pydantic model
+        update_data = user_in.dict(exclude_unset=True)
+    else:
+        # It's already a dict
+        update_data = user_in
     
     # Handle password separately to hash it
     if "password" in update_data:

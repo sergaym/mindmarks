@@ -60,3 +60,22 @@ def hash_password(password: str) -> str:
 # Add alias for backward compatibility
 get_password_hash = hash_password
 
+
+def verify_password(plain_password: str, hashed_password: str) -> bool:
+    """
+    Verify a stored password against one provided by the user with error handling.
+    """
+    try:
+        # Handle fallback hash format if it was used
+        if hashed_password.startswith("$fallback$"):
+            _, salt_hex, hash_hex = hashed_password.split("$", 3)
+            salt = bytes.fromhex(salt_hex)
+            hash_obj = sha256(plain_password.encode() + salt)
+            return hash_obj.hexdigest() == hash_hex
+        
+        # Use passlib for normal verification
+        return pwd_context.verify(plain_password, hashed_password)
+    except Exception as e:
+        logger.error(f"Password verification error: {e}")
+        return False
+

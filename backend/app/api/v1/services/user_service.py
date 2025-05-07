@@ -43,6 +43,8 @@ def create_user(db: Session, user_in: UserCreate) -> User:
         id=str(uuid.uuid4()),
         email=user_in.email,
         full_name=user_in.full_name,
+        is_active=user_in.is_active,
+        is_superuser=user_in.is_superuser,
         hashed_password=hashed_password
     )
     

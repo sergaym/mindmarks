@@ -1,6 +1,7 @@
 from datetime import timedelta
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordRequestForm
+import logging
 
 from app.api.v1.schemas.token import Token
 from app.api.v1.schemas.user import UserCreate, UserRead
@@ -10,6 +11,7 @@ from app.core.security import create_access_token, verify_password
 from app.db.base import DBSession
 
 router = APIRouter()
+logger = logging.getLogger(__name__)
 
 
 @router.post("/login", response_model=Token)
@@ -54,6 +56,16 @@ def register_new_user(user_in: UserCreate, session: DBSession):
             detail="The user with this email already exists",
         )
     
+    # Log if someone is trying to create a superuser
+    if user_in.is_superuser:
+        logger.info(f"Creating superuser account for email: {user_in.email}")
+    
     # Create new user through service layer
-    # The service now returns a proper UserRead model
-    return user_service.create_user(session, user_in) 
+    new_user = user_service.create_user(session, user_in)
+    if not new_user:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to create user"
+        )
+    
+    return new_user 

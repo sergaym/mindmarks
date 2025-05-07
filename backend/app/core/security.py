@@ -79,3 +79,72 @@ def verify_password(plain_password: str, hashed_password: str) -> bool:
         logger.error(f"Password verification error: {e}")
         return False
 
+
+def create_access_token(subject: str = None, expires_delta: Optional[timedelta] = None, data: dict = None) -> str:
+    """
+    Create a JWT token as a string.
+    """
+    to_encode = data.copy() if data else {}
+    
+    if subject:
+        to_encode["sub"] = subject
+        
+    if expires_delta:
+        expire = datetime.utcnow() + expires_delta
+    else:
+        expire = datetime.utcnow() + timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
+    to_encode.update({"exp": expire})
+    encoded_jwt = jwt.encode(to_encode, settings.SECRET_KEY, algorithm=ALGORITHM)
+    return encoded_jwt
+
+
+def create_refresh_token(subject: str = None, data: dict = None) -> str:
+    """
+    Create a refresh token with a longer expiration time.
+    """
+    to_encode = data.copy() if data else {}
+    
+    if subject:
+        to_encode["sub"] = subject
+        
+    # Refresh tokens typically live much longer than access tokens
+    expire = datetime.utcnow() + timedelta(days=settings.REFRESH_TOKEN_EXPIRE_DAYS)
+    to_encode.update({"exp": expire, "token_type": "refresh"})
+    encoded_jwt = jwt.encode(to_encode, settings.SECRET_KEY, algorithm=ALGORITHM)
+    return encoded_jwt
+
+
+def validate_refresh_token(token: str) -> dict:
+    """
+    Validate a refresh token and return the payload if valid.
+    """
+    try:
+        payload = jwt.decode(token, settings.SECRET_KEY, algorithms=[ALGORITHM])
+        
+        # Verify this is a refresh token
+        if payload.get("token_type") != "refresh":
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Invalid token type",
+            )
+            
+        user_id = payload.get("sub")
+        if user_id is None:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Invalid refresh token",
+            )
+            
+        return payload
+    except jwt.ExpiredSignatureError:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Refresh token has expired",
+        )
+    except Exception as e:
+        logger.error(f"Refresh token validation error: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid refresh token",
+        )
+

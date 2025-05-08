@@ -44,7 +44,7 @@ export function ThemeSwitcher({ className }: ThemeSwitcherProps) {
   return (
     <div
       className={cn(
-        'relative isolate flex h-8 rounded-full bg-background p-1 ring-1 ring-border',
+        'relative isolate flex h-8 rounded-lg bg-background p-1 ring-1 ring-border',
         className
       )}
     >
@@ -55,14 +55,14 @@ export function ThemeSwitcher({ className }: ThemeSwitcherProps) {
           <button
             type="button"
             key={key}
-            className="relative h-6 w-6 rounded-full"
+            className="relative h-6 w-6 rounded-md"
             onClick={() => setTheme(key)}
             aria-label={label}
           >
             {isActive && (
               <motion.div
                 layoutId="activeTheme"
-                className="absolute inset-0 rounded-full bg-secondary"
+                className="absolute inset-0 rounded-md bg-secondary"
                 transition={{ type: 'spring', duration: 0.5 }}
               />
             )}

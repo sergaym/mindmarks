@@ -3,6 +3,8 @@
 import Image from 'next/image';
 import Link from 'next/link';
 import { ThemeSwitcher } from '../ui/kibo-ui/theme-switcher';
+import { Button } from '../ui/button';
+import { ArrowUpRight } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { usePathname } from 'next/navigation';
 import { 
@@ -25,9 +27,8 @@ export function Header() {
   };
 
   const navItems = [
-    { href: '/', label: 'Home', name: 'Home', link: '/' },
-    { href: '/dashboard', label: 'Dashboard', name: 'Dashboard', link: '/dashboard' },
     { href: '/about', label: 'About', name: 'About', link: '/about' },
+    { href: '/pricing', label: 'Pricing', name: 'Pricing', link: '/pricing' },
   ];
   
   return (
@@ -51,8 +52,11 @@ export function Header() {
           
           <NavItems items={navItems} />
           
-          <div className="relative z-20 flex items-center gap-2">
+          <div className="relative z-20 flex items-center gap-4">
             <ThemeSwitcher />
+            <Button size="sm" className="rounded-lg hidden md:flex">
+              Start Reading <ArrowUpRight className="ml-2 h-4 w-4" />
+            </Button>
           </div>
         </NavBody>
         
@@ -96,6 +100,11 @@ export function Header() {
                 {item.label}
               </Link>
             ))}
+            <div className="mt-4 w-full">
+              <Button className="w-full rounded-lg">
+                Start Reading <ArrowUpRight className="ml-2 h-4 w-4" />
+              </Button>
+            </div>
           </MobileNavMenu>
         </MobileNav>
       </Navbar>

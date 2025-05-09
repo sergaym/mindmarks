@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { ArrowUpRight, CirclePlay } from "lucide-react";
 import { BackgroundPattern } from "./layout/background-pattern";
 import { cn } from "@/lib/utils";
+import Link from "next/link";
 
 const Hero = () => {
   // Uncomment the color version you prefer:
@@ -31,8 +32,10 @@ const Hero = () => {
           Save interesting articles, add your thoughts as you read, and use AI to extract key insights from your collection.
         </p>
         <div className="mt-12 flex items-center justify-center gap-4 flex-wrap">
-          <Button size="lg" className="rounded-lg text-base">
-            Start Reading <ArrowUpRight className="ml-2 h-4 w-4" />
+          <Button size="lg" className="rounded-lg text-base" asChild>
+            <Link href="/login">
+              Start Reading <ArrowUpRight className="ml-2 h-4 w-4" />
+            </Link>
           </Button>
           <Button
             variant="outline"

@@ -54,8 +54,10 @@ export function Header() {
           
           <div className="relative z-20 flex items-center gap-4">
             <ThemeSwitcher />
-            <Button size="sm" className="rounded-lg hidden md:flex">
-              Start Reading <ArrowUpRight className="ml-2 h-4 w-4" />
+            <Button size="sm" className="rounded-lg hidden md:flex" asChild>
+              <Link href="/login">
+                Start Reading <ArrowUpRight className="ml-2 h-4 w-4" />
+              </Link>
             </Button>
           </div>
         </NavBody>
@@ -101,8 +103,10 @@ export function Header() {
               </Link>
             ))}
             <div className="mt-4 w-full">
-              <Button className="w-full rounded-lg">
-                Start Reading <ArrowUpRight className="ml-2 h-4 w-4" />
+              <Button className="w-full rounded-lg" asChild>
+                <Link href="/login">
+                  Start Reading <ArrowUpRight className="ml-2 h-4 w-4" />
+                </Link>
               </Button>
             </div>
           </MobileNavMenu>

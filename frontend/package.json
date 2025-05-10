@@ -9,6 +9,7 @@
     "lint": "next lint"
   },
   "dependencies": {
+    "@auth/core": "^0.39.1",
     "@radix-ui/react-avatar": "^1.1.9",
     "@radix-ui/react-collapsible": "^1.1.10",
     "@radix-ui/react-dialog": "^1.1.13",
@@ -19,6 +20,7 @@
     "@radix-ui/react-tooltip": "^1.2.6",
     "@radix-ui/react-use-controllable-state": "^1.2.2",
     "@tabler/icons-react": "^3.31.0",
+    "bcryptjs": "^3.0.2",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "date-fns": "^4.1.0",
@@ -26,10 +28,12 @@
     "lucide-react": "^0.508.0",
     "motion": "^12.10.1",
     "next": "15.3.2",
+    "next-auth": "^5.0.0-beta.28",
     "next-themes": "^0.4.6",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
-    "tailwind-merge": "^3.2.0"
+    "tailwind-merge": "^3.2.0",
+    "zod": "^3.24.4"
   },
   "devDependencies": {
     "@eslint/eslintrc": "^3",

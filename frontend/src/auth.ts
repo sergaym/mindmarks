@@ -1,9 +1,7 @@
 import NextAuth from "next-auth";
 import CredentialsProvider from "next-auth/providers/credentials";
-import { loginUser } from "@/app/api/v1/users/loginUser";
-import { refreshToken } from "@/app/api/v1/users/refreshToken";
 import type { JWT } from "next-auth/jwt";
-import { fetchUser } from "@/app/api/v1/users/index";
+import { loginUser, refreshToken, fetchUser } from "@/lib/api/auth";
 
 // Function to handle token refresh
 async function refreshAccessToken(token: JWT) {

@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { ArrowRight, Loader2 } from "lucide-react";
 import Link from "next/link";
+import { registerUser } from "@/lib/api/auth";
 
 export function RegisterForm() {
   const router = useRouter();
@@ -20,30 +21,13 @@ export function RegisterForm() {
     setIsLoading(true);
 
     try {
-      // Call your registration API endpoint
-      const response = await fetch('/api/auth/register', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          email,
-          password,
-          full_name: fullName,
-        }),
-      });
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        setError(data.message || "Registration failed");
-        return;
-      }
+      // Call the centralized registration function
+      await registerUser(email, password, fullName);
 
       // Redirect to login page after successful registration
       router.push("/login?registered=true");
     } catch (error) {
-      setError("An unexpected error occurred");
+      setError(error instanceof Error ? error.message : "An unexpected error occurred");
       console.error("Registration error:", error);
     } finally {
       setIsLoading(false);

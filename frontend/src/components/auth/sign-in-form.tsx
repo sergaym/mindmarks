@@ -1,11 +1,12 @@
 "use client";
 
 import { useState } from "react";
-import { signIn } from "@/auth";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { ArrowRight, Loader2 } from "lucide-react";
 import Link from "next/link";
+import { login } from "@/lib/api/client";
+import { setCookie } from "cookies-next";
 
 export function SignInForm() {
   const router = useRouter();
@@ -20,23 +21,32 @@ export function SignInForm() {
     setIsLoading(true);
 
     try {
-      const result = await signIn("credentials", {
-        redirect: false,
-        email,
-        password,
+      console.log("Attempting API login with:", email);
+
+      // Call our API client login function
+      const result = await login(email, password);
+      
+      console.log("Login successful, received token");
+
+      // Store token and email in localStorage for use across the app
+      localStorage.setItem('access_token', result.access_token);
+      localStorage.setItem('token_type', result.token_type);
+      localStorage.setItem('user_email', email);
+      
+      // Also set in cookie for middleware (server-side) access
+      // Set secure, httpOnly cookie that middleware can access
+      setCookie('auth_token', result.access_token, {
+        maxAge: 60 * 60 * 24 * 7, // 1 week
+        path: '/',
+        sameSite: 'strict',
       });
-
-      if (!result?.ok) {
-        setError(result?.error || "Something went wrong");
-        return;
-      }
-
+      
       // Success - redirect to dashboard
+      console.log("Redirecting to dashboard...");
       router.push("/dashboard");
-      router.refresh();
     } catch (error) {
-      setError("An unexpected error occurred");
-      console.error("Sign-in error:", error);
+      console.error("Login error:", error);
+      setError("Login failed. Please check your credentials and try again.");
     } finally {
       setIsLoading(false);
     }
@@ -117,7 +127,6 @@ export function SignInForm() {
           )}
         </Button>
       </div>
-      
       
       <div className="pt-3 text-center border-t border-border mt-2">
         <p className="text-sm text-muted-foreground pt-3">

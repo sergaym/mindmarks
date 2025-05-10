@@ -14,7 +14,7 @@ export type User = {
 async function apiRequest<T>(
   endpoint: string, 
   method: string, 
-  data?: Record<string, any>, 
+  data?: Record<string, unknown>, 
   token?: string,
   contentType: 'json' | 'form-urlencoded' = 'form-urlencoded'
 ): Promise<T> {

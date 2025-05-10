@@ -1,18 +1,4 @@
-import { jwtDecode } from 'jwt-decode';
-import { User as NextAuthUser } from 'next-auth';
 import { fetchClient } from '@/lib/api/fetchClient';
-
-const API_URL = process.env.NEXT_PUBLIC_BACKEND_URL;
-
-interface DecodedToken {
-  sub?: string;
-  user_id?: string;
-  id?: string;
-  userId?: string;
-  exp?: number;
-  jti?: string;
-  [key: string]: unknown;
-}
 
 // Define user types
 export type User = {
@@ -92,8 +78,8 @@ export async function loginUser(email: string, password: string): Promise<User |
       name: email,
       accessToken: response.access_token,
     };
-  } catch (error) {
-    console.error('Login error:', error);
+  } catch (err) {
+    console.error('Login error:', err);
     return null;
   }
 }
@@ -117,20 +103,6 @@ export interface RefreshTokenResponse {
   expires_in: number;
 }
 
-// Helper for checking HTTP responses
-const checkResponse = async <T = unknown>(response: Response): Promise<T> => {
-  if (!response.ok) {
-    const errorText = await response.text().catch(() => 'Unknown error');
-    throw new Error(`HTTP error! Status: ${response.status}, Error: ${errorText}`);
-  }
-  
-  if (response.status === 204) {
-    return {} as T;
-  }
-  
-  return response.json() as T;
-};
-
 export const refreshToken = async (token: unknown): Promise<RefreshTokenResponse | null> => {
   try {
     // Check if the token is valid
@@ -147,10 +119,12 @@ export const refreshToken = async (token: unknown): Promise<RefreshTokenResponse
         null, 
         { refresh_token: refreshToken }
       );
-    } catch (error) {
+    } catch (err) {
+      console.error('Refresh token error:', err);
       return null;
     }
-  } catch (error) {
+  } catch (err) {
+    console.error('Token validation error:', err);
     return null;
   }
 }; 

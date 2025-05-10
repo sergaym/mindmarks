@@ -77,7 +77,7 @@ export function Header() {
             </div>
           </MobileNavHeader>
           
-          <MobileNavMenu isOpen={isMenuOpen} onClose={() => setIsMenuOpen(false)}>
+          <MobileNavMenu isOpen={isMenuOpen}>
             {navItems.map((item) => (
               <Link 
                 key={item.href}

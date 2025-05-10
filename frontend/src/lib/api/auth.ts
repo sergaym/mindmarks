@@ -9,11 +9,19 @@ export type User = {
 };
 
 /**
- * Makes a form-urlencoded request to the API
+ * Makes a request to the API with the appropriate content type
  */
-async function apiRequest<T>(endpoint: string, method: string, data?: Record<string, string>, token?: string): Promise<T> {
+async function apiRequest<T>(
+  endpoint: string, 
+  method: string, 
+  data?: Record<string, any>, 
+  token?: string,
+  contentType: 'json' | 'form-urlencoded' = 'form-urlencoded'
+): Promise<T> {
   const headers: Record<string, string> = {
-    'Content-Type': 'application/x-www-form-urlencoded',
+    'Content-Type': contentType === 'json' 
+      ? 'application/json'
+      : 'application/x-www-form-urlencoded',
   };
 
   if (token) {
@@ -26,13 +34,18 @@ async function apiRequest<T>(endpoint: string, method: string, data?: Record<str
     headers,
   };
 
-  // Convert data to form-urlencoded format
+  // Format the request body based on content type
   if (data) {
-    const formData = new URLSearchParams();
-    Object.entries(data).forEach(([key, value]) => {
-      formData.append(key, value);
-    });
-    options.body = formData.toString();
+    if (contentType === 'json') {
+      options.body = JSON.stringify(data);
+    } else {
+      // Convert data to form-urlencoded format
+      const formData = new URLSearchParams();
+      Object.entries(data).forEach(([key, value]) => {
+        formData.append(key, String(value));
+      });
+      options.body = formData.toString();
+    }
   }
 
   // Make the request
@@ -46,7 +59,7 @@ async function apiRequest<T>(endpoint: string, method: string, data?: Record<str
   }
 
   // Return response data
-  return response.json();
+  return response.json() as T;
 }
 
 /**
@@ -62,10 +75,16 @@ export async function fetchUser(token: string): Promise<User> {
 export async function loginUser(email: string, password: string): Promise<User | null> {
   try {
     // Backend expects username/password for login
-    const response = await apiRequest<{ access_token: string }>('/api/v1/auth/login', 'POST', {
-      username: email, // Backend expects username, but we use email
-      password,
-    });
+    const response = await apiRequest<{ access_token: string }>(
+      '/api/v1/auth/login', 
+      'POST', 
+      {
+        username: email, // Backend expects username, but we use email
+        password,
+      },
+      undefined,
+      'form-urlencoded' // Login uses form-urlencoded format
+    );
 
     if (!response?.access_token) {
       return null;
@@ -88,11 +107,27 @@ export async function loginUser(email: string, password: string): Promise<User |
  * Register a new user
  */
 export async function registerUser(email: string, password: string, name?: string): Promise<{ message: string }> {
-  return apiRequest<{ message: string }>('/api/v1/users/register', 'POST', {
-    email,
-    password,
-    full_name: name || '',
-  });
+  try {
+    // Use the same apiRequest approach as loginUser for consistency
+    const response = await apiRequest<{ message: string }>(
+      '/api/v1/auth/register', 
+      'POST', 
+      {
+        email,
+        password,
+        full_name: name || '',
+        is_active: true,
+        is_superuser: false
+      },
+      undefined,
+      'json' // Explicitly use JSON format
+    );
+    
+    return response;
+  } catch (err) {
+    console.error('Registration error:', err);
+    throw err;
+  }
 }
 
 export interface RefreshTokenResponse {

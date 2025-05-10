@@ -1,21 +1,17 @@
 'use client';
 
-import { ThemeProvider as NextThemesProvider } from 'next-themes';
 import { ReactNode } from 'react';
+import { ThemeProvider } from 'next-themes';
 
 interface ProvidersProps {
   children: ReactNode;
 }
 
+// Global providers wrapper - in the future, add any global providers here
 export function Providers({ children }: ProvidersProps) {
   return (
-    <NextThemesProvider 
-      attribute="class" 
-      defaultTheme="system" 
-      enableSystem 
-      disableTransitionOnChange
-    >
+    <ThemeProvider attribute="class" enableSystem>
       {children}
-    </NextThemesProvider>
+    </ThemeProvider>
   );
 } 

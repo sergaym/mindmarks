@@ -5,13 +5,13 @@ import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { ArrowRight, Loader2 } from "lucide-react";
 import Link from "next/link";
-import { login } from "@/lib/api/client";
-import { setCookie } from "cookies-next";
+import { registerUser } from "@/lib/api/auth";
 
-export function SignInForm() {
+export function RegisterForm() {
   const router = useRouter();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [fullName, setFullName] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
 
@@ -21,32 +21,14 @@ export function SignInForm() {
     setIsLoading(true);
 
     try {
-      console.log("Attempting API login with:", email);
+      // Call the centralized registration function
+      await registerUser(email, password, fullName);
 
-      // Call our API client login function
-      const result = await login(email, password);
-      
-      console.log("Login successful, received token");
-
-      // Store token and email in localStorage for use across the app
-      localStorage.setItem('access_token', result.access_token);
-      localStorage.setItem('token_type', result.token_type);
-      localStorage.setItem('user_email', email);
-      
-      // Also set in cookie for middleware (server-side) access
-      // Set secure, httpOnly cookie that middleware can access
-      setCookie('auth_token', result.access_token, {
-        maxAge: 60 * 60 * 24 * 7, // 1 week
-        path: '/',
-        sameSite: 'strict',
-      });
-      
-      // Success - redirect to dashboard
-      console.log("Redirecting to dashboard...");
-      router.push("/dashboard");
+      // Redirect to login page after successful registration
+      router.push("/login?registered=true");
     } catch (error) {
-      console.error("Login error:", error);
-      setError("Login failed. Please check your credentials and try again.");
+      setError(error instanceof Error ? error.message : "An unexpected error occurred");
+      console.error("Registration error:", error);
     } finally {
       setIsLoading(false);
     }
@@ -59,6 +41,27 @@ export function SignInForm() {
           {error}
         </div>
       )}
+      
+      <div className="space-y-2">
+        <label
+          htmlFor="fullName"
+          className="block text-sm font-medium text-foreground"
+        >
+          Full Name
+        </label>
+        <input
+          id="fullName"
+          name="fullName"
+          type="text"
+          autoComplete="name"
+          required
+          value={fullName}
+          onChange={(e) => setFullName(e.target.value)}
+          className="w-full px-4 py-3 rounded-lg border bg-background text-foreground border-input focus:border-ring focus:ring-1 focus:ring-ring focus:outline-none transition duration-200 text-sm"
+          disabled={isLoading}
+          placeholder="Your Name"
+        />
+      </div>
       
       <div className="space-y-2">
         <label
@@ -82,22 +85,17 @@ export function SignInForm() {
       </div>
       
       <div className="space-y-2">
-        <div className="flex items-center justify-between">
-          <label
-            htmlFor="password"
-            className="block text-sm font-medium text-foreground"
-          >
-            Password
-          </label>
-          <Link href="/forgot-password" className="text-xs font-medium text-muted-foreground hover:text-foreground transition-colors">
-            Forgot?
-          </Link>
-        </div>
+        <label
+          htmlFor="password"
+          className="block text-sm font-medium text-foreground"
+        >
+          Password
+        </label>
         <input
           id="password"
           name="password"
           type="password"
-          autoComplete="current-password"
+          autoComplete="new-password"
           required
           value={password}
           onChange={(e) => setPassword(e.target.value)}
@@ -117,11 +115,11 @@ export function SignInForm() {
           {isLoading ? (
             <div className="flex items-center justify-center">
               <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-              <span>Signing in...</span>
+              <span>Creating Account...</span>
             </div>
           ) : (
             <div className="flex items-center justify-center">
-              <span>Sign In</span>
+              <span>Create Account</span>
               <ArrowRight className="ml-2 h-4 w-4" />
             </div>
           )}
@@ -130,9 +128,9 @@ export function SignInForm() {
       
       <div className="pt-3 text-center border-t border-border mt-2">
         <p className="text-sm text-muted-foreground pt-3">
-          Don&apos;t have an account?{" "}
-          <Link href="/register" className="font-medium text-foreground hover:text-foreground/80 ml-1 transition-colors">
-            Sign up
+          Already have an account?{" "}
+          <Link href="/login" className="font-medium text-foreground hover:text-foreground/80 ml-1 transition-colors">
+            Sign in
           </Link>
         </p>
       </div>

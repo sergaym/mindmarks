@@ -159,6 +159,26 @@ async def get_current_user(
     return await get_user_from_token(token, db)
 
 
+async def get_current_active_superuser(
+    current_user: User = Depends(get_current_user),
+) -> User:
+    """
+    Check if the current user is active and has superuser privileges.
+    Raises HTTPException if not.
+    """
+    if not current_user.is_active:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Inactive user",
+        )
+    if not current_user.is_superuser:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Not enough permissions",
+        )
+    return current_user
+
+
 async def get_user_from_token(token: str, db: Session) -> User:
     """
     Decodes the JWT token, fetches the user from the DB, or raises if invalid.

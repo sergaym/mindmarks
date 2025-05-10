@@ -1,6 +1,6 @@
 from fastapi import APIRouter
 
-from app.api.v1.endpoints import auth, users, notes, reading_progress
+from app.api.v1.endpoints import auth, users #, notes, reading_progress
 
 # Create an API router specifically for v1 endpoints
 # without prefixing the version - this allows the main app to handle versioning

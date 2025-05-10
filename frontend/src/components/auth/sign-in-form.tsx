@@ -1,10 +1,11 @@
 "use client";
 
 import { useState } from "react";
-import { signIn } from "../../../auth";
+import { signIn } from "@/auth";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { ArrowRight, Loader2 } from "lucide-react";
+import Link from "next/link";
 
 export function SignInForm() {
   const router = useRouter();
@@ -44,7 +45,7 @@ export function SignInForm() {
   return (
     <form onSubmit={handleSubmit} className="space-y-5">
       {error && (
-        <div className="p-3 rounded-lg bg-red-50 border border-red-200 text-red-700 text-xs dark:bg-red-900/20 dark:text-red-300 dark:border-red-800/50">
+        <div className="p-3 rounded-lg bg-destructive/10 border border-destructive/30 text-destructive text-xs">
           {error}
         </div>
       )}
@@ -52,7 +53,7 @@ export function SignInForm() {
       <div className="space-y-2">
         <label
           htmlFor="email"
-          className="block text-sm font-medium text-gray-700 dark:text-gray-300"
+          className="block text-sm font-medium text-foreground"
         >
           Email
         </label>
@@ -64,7 +65,7 @@ export function SignInForm() {
           required
           value={email}
           onChange={(e) => setEmail(e.target.value)}
-          className="w-full px-4 py-3 rounded-lg border bg-white text-gray-800 border-gray-200 focus:border-gray-400 focus:ring-1 focus:ring-gray-300 focus:outline-none transition duration-200 dark:bg-gray-900/40 dark:text-white dark:border-gray-700 dark:focus:ring-gray-700 text-sm"
+          className="w-full px-4 py-3 rounded-lg border bg-background text-foreground border-input focus:border-ring focus:ring-1 focus:ring-ring focus:outline-none transition duration-200 text-sm"
           disabled={isLoading}
           placeholder="you@example.com"
         />
@@ -74,13 +75,13 @@ export function SignInForm() {
         <div className="flex items-center justify-between">
           <label
             htmlFor="password"
-            className="block text-sm font-medium text-gray-700 dark:text-gray-300"
+            className="block text-sm font-medium text-foreground"
           >
             Password
           </label>
-          <a href="#" className="text-xs font-medium text-gray-600 hover:text-gray-800 dark:text-gray-400 dark:hover:text-gray-200">
+          <Link href="/forgot-password" className="text-xs font-medium text-muted-foreground hover:text-foreground transition-colors">
             Forgot?
-          </a>
+          </Link>
         </div>
         <input
           id="password"
@@ -90,7 +91,7 @@ export function SignInForm() {
           required
           value={password}
           onChange={(e) => setPassword(e.target.value)}
-          className="w-full px-4 py-3 rounded-lg border bg-white text-gray-800 border-gray-200 focus:border-gray-400 focus:ring-1 focus:ring-gray-300 focus:outline-none transition duration-200 dark:bg-gray-900/40 dark:text-white dark:border-gray-700 dark:focus:ring-gray-700 text-sm"
+          className="w-full px-4 py-3 rounded-lg border bg-background text-foreground border-input focus:border-ring focus:ring-1 focus:ring-ring focus:outline-none transition duration-200 text-sm"
           disabled={isLoading}
           placeholder="••••••••"
         />
@@ -100,7 +101,7 @@ export function SignInForm() {
         <Button
           type="submit"
           disabled={isLoading}
-          className="w-full h-11 rounded-lg text-sm font-medium bg-blue-600 hover:bg-blue-700 text-white dark:bg-blue-600 dark:hover:bg-blue-700 transition-colors duration-200"
+          className="w-full h-11 rounded-lg text-sm font-medium"
           size="lg"
         >
           {isLoading ? (
@@ -118,12 +119,12 @@ export function SignInForm() {
       </div>
       
       
-      <div className="pt-3 text-center border-t border-gray-200 dark:border-gray-800 mt-2">
-        <p className="text-sm text-gray-600 dark:text-gray-400 pt-3">
+      <div className="pt-3 text-center border-t border-border mt-2">
+        <p className="text-sm text-muted-foreground pt-3">
           Don't have an account?{" "}
-          <a href="#" className="font-medium text-gray-700 hover:text-gray-900 dark:text-white dark:hover:text-white/80 ml-1">
+          <Link href="/register" className="font-medium text-foreground hover:text-foreground/80 ml-1 transition-colors">
             Sign up
-          </a>
+          </Link>
         </p>
       </div>
     </form>

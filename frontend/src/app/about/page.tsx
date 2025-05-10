@@ -38,7 +38,7 @@ export default function AboutPage() {
         <div className="border-t border-border pt-8 mt-12">
           <h2 className="text-2xl font-semibold mb-6">Our Mission</h2>
           <p className="text-lg">
-            We believe that reading isn't just about consuming information—it's about connecting ideas, discovering insights, and building knowledge over time. Mindmarks helps you get more value from everything you read.
+            We believe that reading isn&apos;t just about consuming information—it&apos;s about connecting ideas, discovering insights, and building knowledge over time. Mindmarks helps you get more value from everything you read.
           </p>
         </div>
 

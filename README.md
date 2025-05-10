@@ -23,6 +23,7 @@ Mindmarks helps you collect interesting articles and content you want to read, a
 ## 🔗 Links
 
 - 🌐 [eseaeme](https://eseaemefund.xyz)
+- 📧 Contact: sergioayala.contacto@gmail.com
 
 ---
 

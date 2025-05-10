@@ -33,9 +33,26 @@ The API will be available at [http://localhost:8000](http://localhost:8000)
 You can customize the application by passing environment variables:
 
 ```bash
-# Example with environment variables
+# Example with environment variables for database connection
 docker run -p 8000:8000 \
-  -e DATABASE_URL=postgresql://user:password@db:5432/mindmarks \
+  -e DB_HOST=your_db_host \
+  -e DB_PORT=5432 \
+  -e DB_USERNAME=your_username \
+  -e DB_PASSWORD=your_password \
+  -e DB_DATABASE=your_database \
+  -e SECRET_KEY=your_secret_key \
+  mindmarks-backend
+```
+
+For connecting to a Neon database (example):
+
+```bash
+docker run -p 8000:8000 \
+  -e DB_HOST=ep-example-project-12345.us-east-1.aws.neon.tech \
+  -e DB_USERNAME=neondb_owner \
+  -e DB_DATABASE=neondb \
+  -e DB_PASSWORD=your_password \
+  -e DB_PORT=5432 \
   -e SECRET_KEY=your_secret_key \
   mindmarks-backend
 ```

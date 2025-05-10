@@ -20,7 +20,7 @@ function getToken(): { token: string, type: string } | null {
 /**
  * Make a GET request to the API
  */
-export async function apiGet<T = any>(endpoint: string): Promise<T> {
+export async function apiGet<T = unknown>(endpoint: string): Promise<T> {
   const tokenData = getToken();
   const headers: HeadersInit = {};
   
@@ -50,7 +50,7 @@ export async function apiGet<T = any>(endpoint: string): Promise<T> {
 /**
  * Make a POST request to the API
  */
-export async function apiPost<T = any>(endpoint: string, data: any, isFormUrlEncoded = false): Promise<T> {
+export async function apiPost<T = unknown>(endpoint: string, data: Record<string, unknown>, isFormUrlEncoded = false): Promise<T> {
   const tokenData = getToken();
   const headers: HeadersInit = {
     'Content-Type': isFormUrlEncoded ? 'application/x-www-form-urlencoded' : 'application/json',

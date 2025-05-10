@@ -3,7 +3,6 @@
 import { Button } from "@/components/ui/button";
 import { ArrowUpRight, CirclePlay } from "lucide-react";
 import { BackgroundPattern } from "./layout/background-pattern";
-import { cn } from "@/lib/utils";
 import Link from "next/link";
 
 const Hero = () => {

@@ -130,7 +130,7 @@ export function SignInForm() {
       
       <div className="pt-3 text-center border-t border-border mt-2">
         <p className="text-sm text-muted-foreground pt-3">
-          Don't have an account?{" "}
+          Don&apos;t have an account?{" "}
           <Link href="/register" className="font-medium text-foreground hover:text-foreground/80 ml-1 transition-colors">
             Sign up
           </Link>

@@ -117,11 +117,6 @@ export function SignInForm() {
         </Button>
       </div>
       
-      <div className="pt-2 text-center">
-        <span className="inline-flex items-center rounded-full px-3 py-1 text-xs font-medium bg-gray-800/30 text-gray-200 border border-gray-700">
-          Test: test@example.com / password123
-        </span>
-      </div>
       
       <div className="pt-3 text-center border-t border-gray-200 dark:border-gray-800 mt-2">
         <p className="text-sm text-gray-600 dark:text-gray-400 pt-3">

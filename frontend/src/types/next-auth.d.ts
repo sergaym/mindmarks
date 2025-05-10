@@ -1,43 +1,43 @@
 // types/next-auth.d.ts
-import 'next-auth';
-import { JWT as DefaultJWT } from 'next-auth/jwt';
+import NextAuth from "next-auth";
+import { JWT } from "next-auth/jwt";
 
-declare module 'next-auth' {
-  interface User {
-    id: string;
-    email: string;
-    full_name?: string;
-    is_active: boolean;
-    is_superuser: boolean;
-    created_at: string;
-    accessToken: string;
-    refreshToken?: string;
+declare module "next-auth" {
+  /**
+   * Returned by `useSession`, `getSession` and received as a prop on the `SessionProvider` React Context
+   */
+  interface Session {
+    accessToken?: string;
+    user: {
+      /** The user's id */
+      id: string;
+      /** The user's name */
+      name?: string;
+      /** The user's email */
+      email?: string;
+    }
   }
 
-  interface Session {
-    user: {
-      id: string;
-      email: string;
-      full_name?: string;
-      is_active: boolean;
-      is_superuser: boolean;
-      accessToken: string;
-    };
-    expires: string;
-    error?: string;
+  /**
+   * The shape of the user object returned in the OAuth providers' `profile` callback,
+   * or the second parameter of the `session` callback, when using a database.
+   */
+  interface User {
+    /** The user's id */
+    id: string;
+    /** The user's name */
+    name?: string;
+    /** The user's email address */
+    email?: string;
+    /** The user's access token */
+    accessToken?: string;
   }
 }
 
-declare module 'next-auth/jwt' {
-  interface JWT extends DefaultJWT {
-    id: string;
-    email: string;
-    full_name?: string;
-    is_active: boolean;
-    is_superuser: boolean;
-    accessToken: string;
-    refreshToken?: string;
-    accessTokenExpires: number;
-    error?: string;
+declare module "next-auth/jwt" {
+  /** Returned by the `jwt` callback and `getToken`, when using JWT sessions */
+  interface JWT {
+    /** The user's access token */
+    accessToken?: string;
   }
 }

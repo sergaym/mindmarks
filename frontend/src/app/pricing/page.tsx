@@ -9,7 +9,7 @@ export default function PricingPage() {
       <div className="text-center space-y-4 mb-16">
         <h1 className="text-4xl md:text-5xl font-bold tracking-tight">Simple, Transparent Pricing</h1>
         <p className="text-xl text-muted-foreground max-w-2xl mx-auto">
-          Choose the plan that's right for you
+          Choose the plan that&apos;s right for you
         </p>
       </div>
 

@@ -5,6 +5,9 @@ WORKDIR /app/
 # Copy source code
 COPY . /app/
 
+# Show pip version for debugging
+RUN pip --version
+
 # Install Python dependencies with specific versions
 RUN pip install --no-cache-dir -r requirements.txt
 

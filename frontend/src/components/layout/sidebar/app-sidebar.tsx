@@ -3,14 +3,11 @@
 import * as React from "react"
 import {
   BookOpen,
-  BookmarkIcon,
   FileTextIcon,
   Headphones,
   Library,
   MonitorPlay,
-  Home,
-  PlusCircle,
-  Tag
+  Home
 } from "lucide-react"
 
 import { NavMain } from "@/components/layout/sidebar/nav-main"

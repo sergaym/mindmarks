@@ -119,7 +119,17 @@ export function useContent() {
   };
 
   // Function to add new content item
-  const addContent = async (newItem: Omit<ContentItem, 'id'>) => {
+  const addContent = async (newItem: {
+    name: string;
+    type: ContentType;
+    startAt: Date;
+    column: string;
+    owner: User;
+    endAt?: Date;
+    description?: string;
+    tags?: string[];
+    url?: string;
+  }) => {
     setStatus('loading');
     try {
       // Simulate API call to create content
@@ -128,7 +138,21 @@ export function useContent() {
       // Generate a simple ID - in a real app, this would come from the API
       const id = `content${content.length + 1}`;
       
-      const newContent = [...content, { ...newItem, id }];
+      // Create a complete content item with proper types
+      const completeItem: ContentItem = {
+        id,
+        name: newItem.name,
+        type: newItem.type,
+        startAt: newItem.startAt,
+        column: newItem.column,
+        owner: newItem.owner,
+        endAt: newItem.endAt,
+        description: newItem.description,
+        tags: newItem.tags,
+        url: newItem.url,
+      };
+      
+      const newContent = [...content, completeItem];
       setContent(newContent);
       setStatus('success');
       return { status: 'success' as Status, data: newContent };
@@ -157,6 +181,11 @@ export function useContent() {
     }
   };
 
+  // Get current user (for now, just return the first user)
+  const getCurrentUser = () => {
+    return users[0];
+  };
+
   return {
     content,
     status,
@@ -164,6 +193,7 @@ export function useContent() {
     updateContent,
     addContent,
     removeContent,
-    setContent
+    setContent,
+    getCurrentUser
   };
 } 

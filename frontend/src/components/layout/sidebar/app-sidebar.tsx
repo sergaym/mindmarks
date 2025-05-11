@@ -20,14 +20,11 @@ import {
   SidebarHeader,
   SidebarRail,
 } from "@/components/ui/sidebar"
+import { useUser } from "@/hooks/use-user"
+import { Skeleton } from "@/components/ui/skeleton"
 
-// This is sample data aligned with the Core Terminology
-const data = {
-  user: {
-    name: "Sergio Ayala",
-    email: "sergioayala.contacto@gmail.com",
-    avatar: "/me.png",
-  },
+// This is sample data for the sidebar navigation
+const navData = {
   teams: [
     {
       name: "Mindmarks",

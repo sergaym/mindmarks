@@ -2,20 +2,18 @@
 
 import * as React from "react"
 import {
-  AudioWaveform,
   BookOpen,
-  Bot,
-  Command,
-  Frame,
-  GalleryVerticalEnd,
-  Map,
-  PieChart,
-  Settings2,
-  SquareTerminal,
+  BookmarkIcon,
+  FileTextIcon,
+  Headphones,
+  Library,
+  MonitorPlay,
+  Home,
+  PlusCircle,
+  Tag
 } from "lucide-react"
 
 import { NavMain } from "@/components/layout/sidebar/nav-main"
-import { NavProjects } from "@/components/layout/sidebar/nav-projects"
 import { NavUser } from "@/components/layout/sidebar/nav-user"
 import { TeamSwitcher } from "@/components/layout/sidebar/team-switcher"
 import {
@@ -26,132 +24,53 @@ import {
   SidebarRail,
 } from "@/components/ui/sidebar"
 
-// This is sample data.
+// This is sample data aligned with the Core Terminology
 const data = {
   user: {
-    name: "shadcn",
-    email: "m@example.com",
-    avatar: "/avatars/shadcn.jpg",
+    name: "Sergio Ayala",
+    email: "sergioayala.contacto@gmail.com",
+    avatar: "/me.png",
   },
   teams: [
     {
-      name: "Acme Inc",
-      logo: GalleryVerticalEnd,
-      plan: "Enterprise",
-    },
-    {
-      name: "Acme Corp.",
-      logo: AudioWaveform,
-      plan: "Startup",
-    },
-    {
-      name: "Evil Corp.",
-      logo: Command,
-      plan: "Free",
-    },
+      name: "Mindmarks",
+      logo: Library,
+      plan: "Personal",
+    }
   ],
   navMain: [
     {
-      title: "Playground",
-      url: "#",
-      icon: SquareTerminal,
+      title: "Dashboard",
+      url: "/dashboard",
+      icon: Home,
       isActive: true,
+    },
+    {
+      title: "Content Library",
+      url: "/dashboard/library",
+      icon: Library,
       items: [
         {
-          title: "History",
-          url: "#",
+          title: "Books",
+          url: "/dashboard/library/books",
+          icon: BookOpen,
         },
         {
-          title: "Starred",
-          url: "#",
+          title: "Articles",
+          url: "/dashboard/library/articles",
+          icon: FileTextIcon,
         },
         {
-          title: "Settings",
-          url: "#",
+          title: "Podcasts",
+          url: "/dashboard/library/podcasts",
+          icon: Headphones,
+        },
+        {
+          title: "Videos",
+          url: "/dashboard/library/videos",
+          icon: MonitorPlay,
         },
       ],
-    },
-    {
-      title: "Models",
-      url: "#",
-      icon: Bot,
-      items: [
-        {
-          title: "Genesis",
-          url: "#",
-        },
-        {
-          title: "Explorer",
-          url: "#",
-        },
-        {
-          title: "Quantum",
-          url: "#",
-        },
-      ],
-    },
-    {
-      title: "Documentation",
-      url: "#",
-      icon: BookOpen,
-      items: [
-        {
-          title: "Introduction",
-          url: "#",
-        },
-        {
-          title: "Get Started",
-          url: "#",
-        },
-        {
-          title: "Tutorials",
-          url: "#",
-        },
-        {
-          title: "Changelog",
-          url: "#",
-        },
-      ],
-    },
-    {
-      title: "Settings",
-      url: "#",
-      icon: Settings2,
-      items: [
-        {
-          title: "General",
-          url: "#",
-        },
-        {
-          title: "Team",
-          url: "#",
-        },
-        {
-          title: "Billing",
-          url: "#",
-        },
-        {
-          title: "Limits",
-          url: "#",
-        },
-      ],
-    },
-  ],
-  projects: [
-    {
-      name: "Design Engineering",
-      url: "#",
-      icon: Frame,
-    },
-    {
-      name: "Sales & Marketing",
-      url: "#",
-      icon: PieChart,
-    },
-    {
-      name: "Travel",
-      url: "#",
-      icon: Map,
     },
   ],
 }
@@ -164,7 +83,6 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
       </SidebarHeader>
       <SidebarContent>
         <NavMain items={data.navMain} />
-        <NavProjects projects={data.projects} />
       </SidebarContent>
       <SidebarFooter>
         <NavUser user={data.user} />

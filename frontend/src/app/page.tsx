@@ -8,7 +8,7 @@ export default function Home() {
   return (
     <>
       <Header />
-      <main className="flex-1 flex flex-col">
+      <main className="flex-1 flex flex-col relative">
         <Hero />
       </main>
       <Footer />

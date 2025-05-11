@@ -74,8 +74,39 @@ export default function Page() {
   };
 
   // Handler for adding new content
-  const handleAddContent = async (newItem: Omit<ContentItem, 'id'>) => {
+  const handleAddContent = async (newItem: {
+    name: string;
+    type: ContentType;
+    startAt: Date;
+    column: string;
+    owner: User;
+    endAt?: Date;
+    description?: string;
+    tags?: string[];
+    url?: string;
+  }) => {
     await addContent(newItem);
+  };
+
+  // Handler for removing content
+  const handleRemoveContent = async (id: string) => {
+    console.log('Deleting item:', id);
+    setItemToDelete(id);
+  };
+
+  const confirmDelete = async () => {
+    if (itemToDelete) {
+      console.log('Confirming delete for item:', itemToDelete);
+      setIsDeleting(true);
+      try {
+        await removeContent(itemToDelete);
+      } catch (error) {
+        console.error('Error deleting item:', error);
+      } finally {
+        setIsDeleting(false);
+        setItemToDelete(null);
+      }
+    }
   };
 
   // Show loading state

@@ -27,7 +27,6 @@ import { useState, useEffect } from 'react';
 import { useContent } from '@/hooks/use-content';
 import { useKanban, contentTypeIcons, dateFormatter, shortDateFormatter } from '@/hooks/use-kanban';
 import { ContentItem, ContentType, User } from '@/types/content';
-import { Button } from '@/components/ui/button';
 import { AddContentButton } from '@/components/content/add-content-button';
 import { DeleteButton } from '@/components/content/delete-button';
 import { DeleteConfirmationDialog } from '@/components/content/delete-confirmation-dialog';
@@ -57,7 +56,6 @@ export default function Page() {
   
   const { 
     columns,
-    getColumnCounts 
   } = useKanban(content);
 
   // Handler for when items are moved between columns

@@ -34,7 +34,7 @@ export const shortDateFormatter = new Intl.DateTimeFormat('en-US', {
 /**
  * Custom hook for Kanban board operations
  */
-export function useKanban(initialContent: ContentItem[] = []) {
+export function useKanban() {
   const [columns, setColumns] = useState<KanbanColumn[]>(defaultColumns);
   
   // Count items in each column

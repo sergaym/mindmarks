@@ -20,14 +20,11 @@ import {
   SidebarHeader,
   SidebarRail,
 } from "@/components/ui/sidebar"
+import { useUser } from "@/hooks/use-user"
+import { Skeleton } from "@/components/ui/skeleton"
 
-// This is sample data aligned with the Core Terminology
-const data = {
-  user: {
-    name: "Sergio Ayala",
-    email: "sergioayala.contacto@gmail.com",
-    avatar: "/me.png",
-  },
+// This is sample data for the sidebar navigation
+const navData = {
   teams: [
     {
       name: "Mindmarks",
@@ -44,28 +41,36 @@ const data = {
     },
     {
       title: "Content Library",
-      url: "/dashboard/library",
+      url: "#", 
       icon: Library,
       items: [
         {
           title: "Books",
-          url: "/dashboard/library/books",
+          url: "#",
           icon: BookOpen,
+          disabled: true,
+          comingSoon: true
         },
         {
           title: "Articles",
-          url: "/dashboard/library/articles",
+          url: "#",
           icon: FileTextIcon,
+          disabled: true,
+          comingSoon: true
         },
         {
           title: "Podcasts",
-          url: "/dashboard/library/podcasts",
+          url: "#",
           icon: Headphones,
+          disabled: true,
+          comingSoon: true
         },
         {
           title: "Videos",
-          url: "/dashboard/library/videos",
+          url: "#",
           icon: MonitorPlay,
+          disabled: true,
+          comingSoon: true
         },
       ],
     },
@@ -73,16 +78,34 @@ const data = {
 }
 
 export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
+  const { user, isLoading } = useUser();
+  
   return (
     <Sidebar collapsible="icon" {...props}>
       <SidebarHeader>
-        <TeamSwitcher teams={data.teams} />
+        <TeamSwitcher teams={navData.teams} />
       </SidebarHeader>
       <SidebarContent>
-        <NavMain items={data.navMain} />
+        <NavMain items={navData.navMain} />
       </SidebarContent>
       <SidebarFooter>
-        <NavUser user={data.user} />
+        {isLoading ? (
+          <div className="px-2 py-3">
+            <div className="flex items-center gap-2">
+              <Skeleton className="h-8 w-8 rounded-lg" />
+              <div className="space-y-1">
+                <Skeleton className="h-4 w-24" />
+                <Skeleton className="h-3 w-32" />
+              </div>
+            </div>
+          </div>
+        ) : user ? (
+          <NavUser user={user} />
+        ) : (
+          <div className="px-2 py-3 text-xs text-muted-foreground">
+            Not signed in
+          </div>
+        )}
       </SidebarFooter>
       <SidebarRail />
     </Sidebar>

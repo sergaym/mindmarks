@@ -23,7 +23,7 @@ import {
   KanbanHeader,
   KanbanProvider,
 } from '@/components/ui/kibo-ui/kanban';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useContent } from '@/hooks/use-content';
 import { useKanban, contentTypeIcons, dateFormatter, shortDateFormatter } from '@/hooks/use-kanban';
 import { ContentItem, ContentType, User } from '@/types/content';
@@ -37,9 +37,20 @@ import {
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { AddContentButton } from '@/components/content/add-content-button';
+import { DeleteButton } from '@/components/content/delete-button';
 
 export default function Page() {
-  const [isAddModalOpen, setIsAddModalOpen] = useState(false);
+  const [itemToDelete, setItemToDelete] = useState<string | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
+  
+  // Debug dialog state
+  useEffect(() => {
+    if (itemToDelete) {
+      console.log('Dialog should open with item:', itemToDelete);
+    } else {
+      console.log('Dialog should close');
+    }
+  }, [itemToDelete]);
   
   // Initialize hooks for content and Kanban management
   const { 

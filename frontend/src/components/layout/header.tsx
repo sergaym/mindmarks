@@ -10,7 +10,6 @@ import { usePathname } from 'next/navigation';
 import { 
   Navbar, 
   NavBody, 
-  NavItems, 
   MobileNav, 
   MobileNavHeader, 
   MobileNavMenu, 
@@ -32,8 +31,8 @@ export function Header() {
   ];
   
   return (
-    <div className="w-full">
-      <Navbar className="top-6">
+    <div className="w-full sticky top-0">
+      <Navbar className="top-0 backdrop-blur-md bg-background/90">
         <NavBody>
           <div className="relative z-20 flex items-center">
             <Link href="/" className="flex items-center gap-2 mr-8">
@@ -41,7 +40,24 @@ export function Header() {
             </Link>
           </div>
           
-          <NavItems items={navItems} />
+          <div className="flex-1 flex justify-center items-center">
+            <div className="hidden lg:flex items-center gap-6">
+              {navItems.map((item) => (
+                <Link 
+                  key={item.href}
+                  href={item.href} 
+                  className={cn(
+                    "text-sm font-medium py-2 px-3 rounded-md transition-colors duration-200 hover:bg-muted/60",
+                    isActiveLink(item.href) 
+                      ? "text-foreground" 
+                      : "text-muted-foreground hover:text-foreground"
+                  )}
+                >
+                  {item.label}
+                </Link>
+              ))}
+            </div>
+          </div>
           
           <div className="relative z-20 flex items-center gap-4">
             <ThemeSwitcher />

@@ -32,8 +32,8 @@ export function Header() {
   ];
   
   return (
-    <div className="w-full">
-      <Navbar className="top-6">
+    <div className="w-full sticky top-0">
+      <Navbar className="top-0 backdrop-blur-md bg-background/90">
         <NavBody>
           <div className="relative z-20 flex items-center">
             <Link href="/" className="flex items-center gap-2 mr-8">

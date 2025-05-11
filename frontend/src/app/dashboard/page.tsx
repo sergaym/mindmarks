@@ -26,8 +26,17 @@ import {
 import { useState } from 'react';
 import { useContent } from '@/hooks/use-content';
 import { useKanban, contentTypeIcons, dateFormatter, shortDateFormatter } from '@/hooks/use-kanban';
-import { AddContentModal } from '@/components/content/add-content-modal';
-import { ContentItem } from '@/types/content';
+import { ContentItem, ContentType, User } from '@/types/content';
+import { 
+  Dialog, 
+  DialogContent, 
+  DialogHeader, 
+  DialogTitle, 
+  DialogFooter,
+  DialogDescription,
+} from '@/components/ui/dialog';
+import { Button } from '@/components/ui/button';
+import { AddContentButton } from '@/components/content/add-content-button';
 
 export default function Page() {
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);

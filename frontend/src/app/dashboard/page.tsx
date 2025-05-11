@@ -56,7 +56,7 @@ export default function Page() {
   
   const { 
     columns,
-  } = useKanban(content);
+  } = useKanban();
 
   // Handler for when items are moved between columns
   const handleDataChange = async (updatedContent: ContentItem[]) => {

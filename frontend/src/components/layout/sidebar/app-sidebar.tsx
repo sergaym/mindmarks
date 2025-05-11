@@ -44,28 +44,32 @@ const data = {
     },
     {
       title: "Content Library",
-      url: "/dashboard/library",
+      url: "#",
       icon: Library,
       items: [
         {
           title: "Books",
-          url: "/dashboard/library/books",
+          url: "#",
           icon: BookOpen,
+          disabled: true,
         },
         {
           title: "Articles",
-          url: "/dashboard/library/articles",
+          url: "#",
           icon: FileTextIcon,
+          disabled: true,
         },
         {
           title: "Podcasts",
-          url: "/dashboard/library/podcasts",
+          url: "#",
           icon: Headphones,
+          disabled: true,
         },
         {
           title: "Videos",
-          url: "/dashboard/library/videos",
+          url: "#",
           icon: MonitorPlay,
+          disabled: true,
         },
       ],
     },

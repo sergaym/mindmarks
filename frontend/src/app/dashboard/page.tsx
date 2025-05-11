@@ -169,12 +169,10 @@ export default function Page() {
         <div className="flex flex-1 flex-col gap-4 p-4">
           <div className="flex items-center justify-between">
             <h1 className="text-2xl font-bold">My Content</h1>
-            <button 
-              className="rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90"
-              onClick={() => setIsAddModalOpen(true)}
-            >
-              Add New
-            </button>
+            <AddContentButton
+              onAdd={handleAddContent}
+              currentUser={getCurrentUser()}
+            />
           </div>
           
           <div className="h-[calc(100vh-160px)] overflow-x-auto">

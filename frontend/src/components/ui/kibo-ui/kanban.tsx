@@ -91,6 +91,7 @@ export const KanbanBoard = ({ id, children, className }: KanbanBoardProps) => {
 export type KanbanCardProps<T extends KanbanItemProps = KanbanItemProps> = T & {
   children?: ReactNode;
   className?: string;
+  onDelete?: (id: string) => void;
 };
 
 export const KanbanCard = <T extends KanbanItemProps = KanbanItemProps>({
@@ -98,6 +99,7 @@ export const KanbanCard = <T extends KanbanItemProps = KanbanItemProps>({
   name,
   children,
   className,
+  onDelete,
 }: KanbanCardProps<T>) => {
   const {
     attributes,
@@ -116,29 +118,60 @@ export const KanbanCard = <T extends KanbanItemProps = KanbanItemProps>({
     transform: CSS.Transform.toString(transform),
   };
 
+  // Define card content
+  const renderCardContent = () => {
+    // If no children are provided, show default layout with delete button
+    if (!children) {
+      return (
+        <div className="flex items-start justify-between gap-2">
+          <p className="m-0 flex-1 font-medium text-sm">{name}</p>
+          {onDelete && (
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                onDelete(id);
+              }}
+              className="text-muted-foreground opacity-0 transition-opacity hover:text-destructive group-hover:opacity-100"
+              aria-label="Delete content"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-3.5 w-3.5">
+                <path d="M3 6h18"></path>
+                <path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"></path>
+                <path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"></path>
+              </svg>
+            </button>
+          )}
+        </div>
+      );
+    }
+    
+    // For custom children, just return the children without a delete button
+    return children;
+  };
+
   return (
     <>
       <div style={style} {...listeners} {...attributes} ref={setNodeRef}>
         <Card
           className={cn(
-            'cursor-grab gap-4 rounded-md p-3 shadow-sm',
+            'cursor-grab gap-4 rounded-md p-3 shadow-sm group',
             isDragging && 'pointer-events-none cursor-grabbing opacity-30',
             className
           )}
         >
-          {children ?? <p className="m-0 font-medium text-sm">{name}</p>}
+          {renderCardContent()}
         </Card>
       </div>
       {activeCardId === id && (
         <t.In>
           <Card
             className={cn(
-              'cursor-grab gap-4 rounded-md p-3 shadow-sm ring-2 ring-primary',
+              'cursor-grab gap-4 rounded-md p-3 shadow-sm ring-2 ring-primary group',
               isDragging && 'cursor-grabbing',
               className
             )}
           >
-            {children ?? <p className="m-0 font-medium text-sm">{name}</p>}
+            {renderCardContent()}
           </Card>
         </t.In>
       )}

@@ -41,30 +41,30 @@ const navData = {
     },
     {
       title: "Content Library",
-      url: "#",
+      url: "#", // Changed from "/dashboard/library" to "#" to prevent navigation
       icon: Library,
       items: [
         {
           title: "Books",
-          url: "#",
+          url: "#", // Changed from "/dashboard/library/books" to "#"
           icon: BookOpen,
-          disabled: true,
+          disabled: true, // Added to indicate this item is not functional yet
         },
         {
           title: "Articles",
-          url: "#",
+          url: "#", // Changed from "/dashboard/library/articles" to "#"
           icon: FileTextIcon,
           disabled: true,
         },
         {
           title: "Podcasts",
-          url: "#",
+          url: "#", // Changed from "/dashboard/library/podcasts" to "#"
           icon: Headphones,
           disabled: true,
         },
         {
           title: "Videos",
-          url: "#",
+          url: "#", // Changed from "/dashboard/library/videos" to "#"
           icon: MonitorPlay,
           disabled: true,
         },

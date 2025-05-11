@@ -382,7 +382,7 @@ export const KanbanProvider = <
       >
         <div
           className={cn(
-            'grid size-full auto-cols-fr grid-flow-col gap-4',
+            'grid w-full grid-cols-1 md:grid-cols-3 gap-4',
             className
           )}
         >
@@ -391,7 +391,13 @@ export const KanbanProvider = <
         {typeof window !== 'undefined' &&
           createPortal(
             <DragOverlay>
-              <t.Out />
+              {activeItem ? (
+                <Card className="cursor-grabbing gap-4 rounded-md p-3 shadow-md border border-primary/20 bg-card">
+                  <div className="flex items-start justify-between gap-2">
+                    <p className="m-0 flex-1 font-medium text-sm">{activeItem.name}</p>
+                  </div>
+                </Card>
+              ) : null}
             </DragOverlay>,
             document.body
           )}

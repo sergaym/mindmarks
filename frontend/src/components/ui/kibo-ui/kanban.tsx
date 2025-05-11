@@ -245,17 +245,49 @@ export const KanbanProvider = <
   ...props
 }: KanbanProviderProps<T, C>) => {
   const [activeCardId, setActiveCardId] = useState<string | null>(null);
+  const [activeItem, setActiveItem] = useState<T | null>(null);
+
+  const mouseSensor = useSensor(MouseSensor, {
+    // Require the mouse to move by 10 pixels before activating
+    activationConstraint: {
+      distance: 10,
+    },
+    // Don't start drag when clicking on elements with data-no-drag attribute
+    modifiers: {
+      // @ts-ignore - modifiers is not properly typed in dnd-kit
+      beforeStartDragging: (event: any) => {
+        const target = event.target as HTMLElement;
+        // Check if the click was on or inside an element with data-no-drag attribute
+        if (target.closest('[data-no-drag]')) {
+          return false;
+        }
+        return true;
+      }
+    }
+  });
+  
+  const touchSensor = useSensor(TouchSensor, {
+    // Press delay of 250ms, with tolerance of 5px of movement
+    activationConstraint: {
+      delay: 250,
+      tolerance: 5,
+    },
+  });
+  
+  const keyboardSensor = useSensor(KeyboardSensor);
 
   const sensors = useSensors(
-    useSensor(MouseSensor),
-    useSensor(TouchSensor),
-    useSensor(KeyboardSensor)
+    mouseSensor,
+    touchSensor,
+    keyboardSensor
   );
 
   const handleDragStart = (event: DragStartEvent) => {
-    const card = data.find((item) => item.id === event.active.id);
+    const cardId = event.active.id as string;
+    const card = data.find((item) => item.id === cardId);
     if (card) {
-      setActiveCardId(event.active.id as string);
+      setActiveCardId(cardId);
+      setActiveItem(card as T);
     }
     onDragStart?.(event);
   };

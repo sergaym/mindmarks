@@ -27,21 +27,13 @@ import { useState, useEffect } from 'react';
 import { useContent } from '@/hooks/use-content';
 import { useKanban, contentTypeIcons, dateFormatter, shortDateFormatter } from '@/hooks/use-kanban';
 import { ContentItem, ContentType, User } from '@/types/content';
-import { 
-  Dialog, 
-  DialogContent, 
-  DialogHeader, 
-  DialogTitle, 
-  DialogFooter,
-  DialogDescription,
-} from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { AddContentButton } from '@/components/content/add-content-button';
 import { DeleteButton } from '@/components/content/delete-button';
+import { DeleteConfirmationDialog } from '@/components/content/delete-confirmation-dialog';
 
 export default function Page() {
   const [itemToDelete, setItemToDelete] = useState<string | null>(null);
-  const [isDeleting, setIsDeleting] = useState(false);
   
   // Debug dialog state
   useEffect(() => {
@@ -97,15 +89,8 @@ export default function Page() {
   const confirmDelete = async () => {
     if (itemToDelete) {
       console.log('Confirming delete for item:', itemToDelete);
-      setIsDeleting(true);
-      try {
-        await removeContent(itemToDelete);
-      } catch (error) {
-        console.error('Error deleting item:', error);
-      } finally {
-        setIsDeleting(false);
-        setItemToDelete(null);
-      }
+      await removeContent(itemToDelete);
+      setItemToDelete(null);
     }
   };
 
@@ -286,12 +271,12 @@ export default function Page() {
         </div>
       </SidebarInset>
       
-      {/* Add Content Modal */}
-      <AddContentModal
-        isOpen={isAddModalOpen}
-        onClose={() => setIsAddModalOpen(false)}
-        onAdd={handleAddContent}
-        currentUser={getCurrentUser()}
+      {/* Delete Confirmation Dialog */}
+      <DeleteConfirmationDialog
+        isOpen={!!itemToDelete}
+        onClose={() => setItemToDelete(null)}
+        onConfirm={confirmDelete}
+        itemId={itemToDelete}
       />
     </SidebarProvider>
   );

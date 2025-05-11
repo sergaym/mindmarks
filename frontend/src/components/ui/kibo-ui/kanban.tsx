@@ -20,6 +20,7 @@ import type {
   DragEndEvent,
   DragOverEvent,
   DragStartEvent,
+  UniqueIdentifier,
 } from '@dnd-kit/core';
 import { SortableContext, arrayMove, useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
@@ -77,8 +78,8 @@ export const KanbanBoard = ({ id, children, className }: KanbanBoardProps) => {
   return (
     <div
       className={cn(
-        'flex size-full min-h-40 flex-col divide-y overflow-hidden rounded-md border bg-secondary text-xs shadow-sm ring-2 transition-all',
-        isOver ? 'ring-primary' : 'ring-transparent',
+        'flex h-full min-h-40 flex-col divide-y divide-muted/30 overflow-hidden rounded-lg border border-muted/20 bg-card/30 text-xs shadow-sm transition-all',
+        isOver ? 'ring-1 ring-primary/40' : 'ring-0',
         className
       )}
       ref={setNodeRef}
@@ -154,7 +155,7 @@ export const KanbanCard = <T extends KanbanItemProps = KanbanItemProps>({
       <div style={style} {...listeners} {...attributes} ref={setNodeRef}>
         <Card
           className={cn(
-            'cursor-grab gap-4 rounded-md p-3 shadow-sm group',
+            'cursor-grab gap-4 rounded-md p-3 shadow-sm border border-muted/15 bg-card transition-colors group hover:border-muted/30',
             isDragging && 'pointer-events-none cursor-grabbing opacity-30',
             className
           )}
@@ -166,7 +167,7 @@ export const KanbanCard = <T extends KanbanItemProps = KanbanItemProps>({
         <t.In>
           <Card
             className={cn(
-              'cursor-grab gap-4 rounded-md p-3 shadow-sm ring-2 ring-primary group',
+              'cursor-grab gap-4 rounded-md p-3 shadow-sm border border-primary/20 ring-1 ring-primary/40 group',
               isDragging && 'cursor-grabbing',
               className
             )}

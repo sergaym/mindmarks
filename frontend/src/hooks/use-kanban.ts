@@ -60,9 +60,13 @@ export function useKanban(initialContent: ContentItem[] = []) {
   };
 
   // Add a new column to the board
-  const addColumn = (newColumn: Omit<KanbanColumn, 'id'>) => {
+  const addColumn = (newColumn: { name: string; color: string }) => {
     const id = `column-${columns.length + 1}`;
-    setColumns([...columns, { ...newColumn, id }]);
+    const columnWithId: KanbanColumn = {
+      ...newColumn,
+      id
+    };
+    setColumns([...columns, columnWithId]);
     return { id };
   };
 

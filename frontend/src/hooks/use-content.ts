@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { ContentItem, ContentType, User, Status, ApiResponse } from '@/types/content';
+import { ContentItem, ContentType, User, Status } from '@/types/content';
 
 // Sample user data - will be replaced with API call
 const users: User[] = [
@@ -93,7 +93,8 @@ export function useContent() {
         await new Promise(resolve => setTimeout(resolve, 500));
         setContent(sampleContent);
         setStatus('success');
-      } catch (err) {
+      } catch (error) {
+        console.error('Error fetching content:', error);
         setError('Failed to fetch content');
         setStatus('error');
       }
@@ -111,7 +112,8 @@ export function useContent() {
       setContent(updatedContent);
       setStatus('success');
       return { status: 'success' as Status };
-    } catch (err) {
+    } catch (error) {
+      console.error('Error updating content:', error);
       setError('Failed to update content');
       setStatus('error');
       return { status: 'error' as Status, error: 'Failed to update content' };
@@ -156,7 +158,8 @@ export function useContent() {
       setContent(newContent);
       setStatus('success');
       return { status: 'success' as Status, data: newContent };
-    } catch (err) {
+    } catch (error) {
+      console.error('Error adding content:', error);
       setError('Failed to add content');
       setStatus('error');
       return { status: 'error' as Status, error: 'Failed to add content' };
@@ -174,7 +177,8 @@ export function useContent() {
       setContent(newContent);
       setStatus('success');
       return { status: 'success' as Status, data: newContent };
-    } catch (err) {
+    } catch (error) {
+      console.error('Error removing content:', error);
       setError('Failed to remove content');
       setStatus('error');
       return { status: 'error' as Status, error: 'Failed to remove content' };

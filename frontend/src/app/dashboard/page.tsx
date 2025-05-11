@@ -1,3 +1,5 @@
+'use client';
+
 import { AppSidebar } from "@/components/layout/sidebar/app-sidebar"
 import {
   Breadcrumb,
@@ -13,6 +15,18 @@ import {
   SidebarProvider,
   SidebarTrigger,
 } from "@/components/ui/sidebar"
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import {
+  KanbanBoard,
+  KanbanCard,
+  KanbanCards,
+  KanbanHeader,
+  KanbanProvider,
+} from '@/components/ui/kibo-ui/kanban';
+import { useState } from 'react';
+import { useContent } from '@/hooks/use-content';
+import { useKanban, contentTypeIcons, dateFormatter, shortDateFormatter } from '@/hooks/use-kanban';
+
 
 export default function Page() {
   return (

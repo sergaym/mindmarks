@@ -253,8 +253,7 @@ export const KanbanProvider = <
     },
     // Don't start drag when clicking on elements with data-no-drag attribute
     modifiers: {
-      // @ts-ignore - modifiers is not properly typed in dnd-kit
-      beforeStartDragging: (event: any) => {
+      beforeStartDragging: (event: MouseEvent) => {
         const target = event.target as HTMLElement;
         // Check if the click was on or inside an element with data-no-drag attribute
         if (target.closest('[data-no-drag]')) {

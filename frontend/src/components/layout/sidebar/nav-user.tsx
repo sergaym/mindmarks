@@ -1,12 +1,12 @@
 "use client"
 
 import {
-  BadgeCheck,
   Bell,
   ChevronsUpDown,
   CreditCard,
   LogOut,
   Sparkles,
+  User as UserIcon
 } from "lucide-react"
 import { useRouter } from "next/navigation"
 import { deleteCookie } from "cookies-next"
@@ -31,16 +31,13 @@ import {
   SidebarMenuItem,
   useSidebar,
 } from "@/components/ui/sidebar"
+import { User } from "@/hooks/use-user"
 
 export function NavUser({
   user,
   onLogout,
 }: {
-  user: {
-    name: string
-    email: string
-    avatar: string
-  }
+  user: User;
   onLogout?: () => void;
 }) {
   const { isMobile } = useSidebar()

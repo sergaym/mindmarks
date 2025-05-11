@@ -26,9 +26,12 @@ import {
 import { useState } from 'react';
 import { useContent } from '@/hooks/use-content';
 import { useKanban, contentTypeIcons, dateFormatter, shortDateFormatter } from '@/hooks/use-kanban';
-
+import { AddContentModal } from '@/components/content/add-content-modal';
+import { ContentItem } from '@/types/content';
 
 export default function Page() {
+  const [isAddModalOpen, setIsAddModalOpen] = useState(false);
+  
   // Initialize hooks for content and Kanban management
   const { 
     content, 
@@ -36,7 +39,8 @@ export default function Page() {
     error, 
     updateContent,
     addContent,
-    removeContent 
+    removeContent,
+    getCurrentUser 
   } = useContent();
   
   const { 
@@ -45,8 +49,13 @@ export default function Page() {
   } = useKanban(content);
 
   // Handler for when items are moved between columns
-  const handleDataChange = async (updatedContent: any[]) => {
+  const handleDataChange = async (updatedContent: ContentItem[]) => {
     await updateContent(updatedContent);
+  };
+
+  // Handler for adding new content
+  const handleAddContent = async (newItem: Omit<ContentItem, 'id'>) => {
+    await addContent(newItem);
   };
 
   // Show loading state
@@ -109,7 +118,7 @@ export default function Page() {
           <div className="flex h-[calc(100vh-64px)] items-center justify-center">
             <div className="flex flex-col items-center gap-4 max-w-md text-center px-4">
               <div className="rounded-full bg-red-100 p-3 text-red-600 dark:bg-red-900/20 dark:text-red-400">
-                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" className="h-6 w-6"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg>
+                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-6 w-6"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg>
               </div>
               <h3 className="text-lg font-medium">Error Loading Content</h3>
               <p className="text-sm text-muted-foreground">{error || "There was an error loading your content. Please try again later."}</p>
@@ -153,10 +162,7 @@ export default function Page() {
             <h1 className="text-2xl font-bold">My Content</h1>
             <button 
               className="rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90"
-              onClick={() => {
-                // This would open a modal to add new content
-                console.log("Add new content");
-              }}
+              onClick={() => setIsAddModalOpen(true)}
             >
               Add New
             </button>
@@ -183,7 +189,7 @@ export default function Page() {
                     </div>
                   </KanbanHeader>
                   <KanbanCards id={column.id}>
-                    {(item: any) => (
+                    {(item: ContentItem) => (
                       <KanbanCard
                         key={item.id}
                         id={item.id}
@@ -220,6 +226,14 @@ export default function Page() {
           </div>
         </div>
       </SidebarInset>
+      
+      {/* Add Content Modal */}
+      <AddContentModal
+        isOpen={isAddModalOpen}
+        onClose={() => setIsAddModalOpen(false)}
+        onAdd={handleAddContent}
+        currentUser={getCurrentUser()}
+      />
     </SidebarProvider>
   );
 }

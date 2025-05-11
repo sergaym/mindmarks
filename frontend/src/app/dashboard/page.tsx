@@ -126,38 +126,100 @@ export default function Page() {
     );
   }
 
+  // Main content
   return (
     <SidebarProvider>
       <AppSidebar />
       <SidebarInset>
-        <header className="flex h-16 shrink-0 items-center gap-2 transition-[width,height] ease-linear group-has-[[data-collapsible=icon]]/sidebar-wrapper:h-12">
+        <header className="flex h-16 shrink-0 items-center gap-2 border-b transition-[width,height] ease-linear group-has-[[data-collapsible=icon]]/sidebar-wrapper:h-12">
           <div className="flex items-center gap-2 px-4">
             <SidebarTrigger className="-ml-1" />
             <Separator orientation="vertical" className="mr-2 h-4" />
             <Breadcrumb>
               <BreadcrumbList>
-                <BreadcrumbItem className="hidden md:block">
-                  <BreadcrumbLink href="#">
-                    Building Your Application
-                  </BreadcrumbLink>
-                </BreadcrumbItem>
-                <BreadcrumbSeparator className="hidden md:block" />
                 <BreadcrumbItem>
-                  <BreadcrumbPage>Data Fetching</BreadcrumbPage>
+                  <BreadcrumbLink href="/dashboard">Dashboard</BreadcrumbLink>
+                </BreadcrumbItem>
+                <BreadcrumbSeparator />
+                <BreadcrumbItem>
+                  <BreadcrumbPage>My Content</BreadcrumbPage>
                 </BreadcrumbItem>
               </BreadcrumbList>
             </Breadcrumb>
           </div>
         </header>
-        <div className="flex flex-1 flex-col gap-4 p-4 pt-0">
-          <div className="grid auto-rows-min gap-4 md:grid-cols-3">
-            <div className="aspect-video rounded-xl bg-muted/50" />
-            <div className="aspect-video rounded-xl bg-muted/50" />
-            <div className="aspect-video rounded-xl bg-muted/50" />
+        <div className="flex flex-1 flex-col gap-4 p-4">
+          <div className="flex items-center justify-between">
+            <h1 className="text-2xl font-bold">My Content</h1>
+            <button 
+              className="rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90"
+              onClick={() => {
+                // This would open a modal to add new content
+                console.log("Add new content");
+              }}
+            >
+              Add New
+            </button>
           </div>
-          <div className="min-h-[100vh] flex-1 rounded-xl bg-muted/50 md:min-h-min" />
+          
+          <div className="h-[calc(100vh-160px)] overflow-x-auto">
+            <KanbanProvider
+              onDataChange={handleDataChange}
+              columns={columns}
+              data={content}
+            >
+              {(column) => (
+                <KanbanBoard key={column.id} id={column.id}>
+                  <KanbanHeader>
+                    <div className="flex items-center gap-2">
+                      <div
+                        className="h-2 w-2 rounded-full"
+                        style={{ backgroundColor: column.color }}
+                      />
+                      <span className="font-medium">{column.name}</span>
+                      <span className="ml-1 rounded-full bg-muted px-2 py-0.5 text-xs text-muted-foreground">
+                        {content.filter(item => item.column === column.id).length}
+                      </span>
+                    </div>
+                  </KanbanHeader>
+                  <KanbanCards id={column.id}>
+                    {(item: any) => (
+                      <KanbanCard
+                        key={item.id}
+                        id={item.id}
+                        name={item.name}
+                        column={column.id}
+                      >
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="flex flex-col gap-1">
+                            <div className="flex items-center gap-2">
+                              <span className="text-base">{contentTypeIcons[item.type] || "📄"}</span>
+                              <p className="m-0 flex-1 font-medium text-sm">
+                                {item.name}
+                              </p>
+                            </div>
+                          </div>
+                          {item.owner && (
+                            <Avatar className="h-6 w-6 shrink-0">
+                              <AvatarImage src={item.owner.image} alt={item.owner.name} />
+                              <AvatarFallback>
+                                {item.owner.name?.slice(0, 2)}
+                              </AvatarFallback>
+                            </Avatar>
+                          )}
+                        </div>
+                        <p className="m-0 mt-2 text-xs text-muted-foreground">
+                          {shortDateFormatter.format(item.startAt)} - {item.endAt ? dateFormatter.format(item.endAt) : "Present"}
+                        </p>
+                      </KanbanCard>
+                    )}
+                  </KanbanCards>
+                </KanbanBoard>
+              )}
+            </KanbanProvider>
+          </div>
         </div>
       </SidebarInset>
     </SidebarProvider>
-  )
+  );
 }

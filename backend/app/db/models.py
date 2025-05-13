@@ -11,7 +11,8 @@ from sqlalchemy import (
     TIMESTAMP,
     Float,
     UniqueConstraint,
-    Index
+    Index,
+    DateTime
 )
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.ext.declarative import declarative_base
@@ -27,17 +28,18 @@ class User(Base):
     __tablename__ = "users"
     
     id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
-    email = Column(String(255), unique=True, nullable=False)
-    full_name = Column(String(255))
-    hashed_password = Column(String(255), nullable=False)
-    is_active = Column(Boolean, default=True, nullable=False)
-    is_superuser = Column(Boolean, default=False, nullable=False)
-    created_at = Column(TIMESTAMP(timezone=True), server_default=func.now(), nullable=False)
-    updated_at = Column(TIMESTAMP(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False)
+    email = Column(String, unique=True, index=True, nullable=False)
+    full_name = Column(String, nullable=True)
+    hashed_password = Column(String, nullable=False)
+    is_active = Column(Boolean, default=True)
+    is_superuser = Column(Boolean, default=False)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     
     # Relationships
     notes = relationship("Note", back_populates="user", cascade="all, delete-orphan")
     reading_progress = relationship("ReadingProgress", back_populates="user", cascade="all, delete-orphan")
+    refresh_tokens = relationship("RefreshToken", back_populates="user", cascade="all, delete-orphan")
     
     __table_args__ = (
         Index('users_email_idx', 'email'),
@@ -89,4 +91,18 @@ class ReadingProgress(Base):
         Index('reading_progress_note_id_idx', 'note_id'),
         Index('reading_progress_user_id_idx', 'user_id'),
     )
+
+
+class RefreshToken(Base):
+    __tablename__ = "refresh_tokens"
+    
+    id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
+    token = Column(String, nullable=False, index=True)
+    user_id = Column(String, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    expires_at = Column(DateTime, nullable=False)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    revoked = Column(Boolean, default=False)
+    
+    # Relationship to user
+    user = relationship("User", back_populates="refresh_tokens")
 

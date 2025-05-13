@@ -1,5 +1,5 @@
 from datetime import timedelta
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, Body
 from fastapi.security import OAuth2PasswordRequestForm
 import logging
 
@@ -7,7 +7,7 @@ from app.api.v1.schemas.token import Token
 from app.api.v1.schemas.user import UserCreate, UserRead
 from app.services.user_service import UserService
 from app.core.config import settings
-from app.core.security import create_access_token, verify_password
+from app.core.security import create_access_token, verify_password, create_refresh_token, validate_refresh_token
 from app.db.base import DBSession
 
 router = APIRouter()
@@ -36,12 +36,102 @@ def login_for_access_token(
             status_code=status.HTTP_400_BAD_REQUEST, detail="Inactive user"
         )
     
+    # Generate tokens
     access_token_expires = timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
     access_token = create_access_token(
         subject=str(user.id), expires_delta=access_token_expires
     )
     
-    return {"access_token": access_token, "token_type": "bearer"}
+    # Create refresh token
+    refresh_token = create_refresh_token(subject=str(user.id))
+    
+    # Store refresh token in database
+    user_svc.create_refresh_token(user.id, refresh_token)
+    
+    return {
+        "access_token": access_token, 
+        "refresh_token": refresh_token,
+        "token_type": "bearer"
+    }
+
+
+@router.post("/refresh", response_model=Token)
+def refresh_access_token(
+    session: DBSession, refresh_token: str = Body(..., embed=True)
+):
+    """
+    Get a new access token using a refresh token
+    """
+    user_svc = UserService(session)
+    
+    # Validate the refresh token from JWT perspective
+    try:
+        payload = validate_refresh_token(refresh_token)
+        user_id = payload.get("sub")
+        
+        # Verify token exists in database and is not revoked
+        db_token = user_svc.get_refresh_token(refresh_token)
+        if not db_token:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Invalid or revoked refresh token",
+            )
+        
+        # Verify user exists and is active
+        user = user_svc.get_user_by_id(user_id)
+        if not user or not user.is_active:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Invalid user or inactive user",
+            )
+        
+        # Revoke the used refresh token (token rotation)
+        user_svc.revoke_refresh_token(refresh_token)
+        
+        # Generate new access token
+        access_token_expires = timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
+        access_token = create_access_token(
+            subject=str(user.id), expires_delta=access_token_expires
+        )
+        
+        # Generate new refresh token
+        new_refresh_token = create_refresh_token(subject=str(user.id))
+        
+        # Store new refresh token in database
+        user_svc.create_refresh_token(user.id, new_refresh_token)
+        
+        return {
+            "access_token": access_token,
+            "refresh_token": new_refresh_token,
+            "token_type": "bearer"
+        }
+    
+    except HTTPException as e:
+        raise e
+    except Exception as e:
+        logger.error(f"Refresh token error: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid refresh token",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+
+
+@router.post("/logout", status_code=status.HTTP_200_OK)
+def logout(session: DBSession, refresh_token: str = Body(..., embed=True)):
+    """
+    Logout a user by revoking their refresh token
+    """
+    user_svc = UserService(session)
+    
+    # Revoke the refresh token
+    revoked = user_svc.revoke_refresh_token(refresh_token)
+    if not revoked:
+        # We don't want to give hints about valid/invalid tokens
+        # So just return success regardless
+        pass
+    
+    return {"message": "Successfully logged out"}
 
 
 @router.post("/register", response_model=UserRead, status_code=status.HTTP_201_CREATED)

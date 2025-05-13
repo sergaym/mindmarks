@@ -1,31 +1,95 @@
 /**
- * Simple API client for making requests to the backend
+ * API client for making requests to the backend with token refresh support
  */
+import { refreshAccessToken } from './auth';
 
 const API_URL = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:8000'; 
+
+// Flag to prevent multiple refresh token requests at the same time
+let isRefreshing = false;
+// Queue of callbacks to be called after token refresh
+let refreshSubscribers: Array<(token: string) => void> = [];
 
 /**
  * Get the access token from localStorage
  */
-function getToken(): { token: string, type: string } | null {
+function getToken(): { accessToken: string, refreshToken: string, type: string } | null {
   if (typeof window === 'undefined') return null;
   
-  const token = localStorage.getItem('access_token');
+  const accessToken = localStorage.getItem('access_token');
+  const refreshToken = localStorage.getItem('refresh_token');
   const tokenType = localStorage.getItem('token_type') || 'Bearer';
   
-  if (!token) return null;
-  return { token, type: tokenType };
+  if (!accessToken) return null;
+  return { accessToken, refreshToken: refreshToken || '', type: tokenType };
 }
 
 /**
- * Make a GET request to the API
+ * Subscribe a callback to be executed when tokens refresh
  */
-export async function apiGet<T = unknown>(endpoint: string): Promise<T> {
+function subscribeTokenRefresh(callback: (token: string) => void): void {
+  refreshSubscribers.push(callback);
+}
+
+/**
+ * Notify all subscribers about new token
+ */
+function onTokenRefreshed(token: string): void {
+  refreshSubscribers.forEach((callback) => callback(token));
+  refreshSubscribers = [];
+}
+
+/**
+ * Handle token refresh for 401 errors
+ */
+async function handleTokenRefresh(): Promise<string | null> {
+  try {
+    if (!isRefreshing) {
+      isRefreshing = true;
+      
+      const refreshResult = await refreshAccessToken();
+      
+      if (refreshResult.success && refreshResult.data.access_token) {
+        onTokenRefreshed(refreshResult.data.access_token);
+        return refreshResult.data.access_token;
+      }
+      
+      // If refresh failed, clear all tokens
+      localStorage.removeItem('access_token');
+      localStorage.removeItem('refresh_token');
+      localStorage.removeItem('token_type');
+      
+      // Redirect to login page if in browser
+      if (typeof window !== 'undefined') {
+        window.location.href = '/login?error=session_expired';
+      }
+      
+      return null;
+    } else {
+      // If already refreshing, return a promise that resolves when refreshed
+      return new Promise<string>((resolve) => {
+        subscribeTokenRefresh((token: string) => {
+          resolve(token);
+        });
+      });
+    }
+  } catch (error) {
+    console.error('Error refreshing token:', error);
+    return null;
+  } finally {
+    isRefreshing = false;
+  }
+}
+
+/**
+ * Make a GET request to the API with token refresh support
+ */
+export async function apiGet<T = unknown>(endpoint: string, retrying = false): Promise<T> {
   const tokenData = getToken();
   const headers: HeadersInit = {};
   
   if (tokenData) {
-    headers['Authorization'] = `${tokenData.type} ${tokenData.token}`;
+    headers['Authorization'] = `${tokenData.type} ${tokenData.accessToken}`;
   }
   
   try {
@@ -33,6 +97,18 @@ export async function apiGet<T = unknown>(endpoint: string): Promise<T> {
       method: 'GET',
       headers,
     });
+    
+    // Handle 401 with token refresh
+    if (response.status === 401 && tokenData?.refreshToken && !retrying) {
+      const newToken = await handleTokenRefresh();
+      
+      if (newToken) {
+        // Retry the request with the new token
+        return apiGet<T>(endpoint, true);
+      } else {
+        throw new Error('Session expired. Please login again.');
+      }
+    }
     
     if (!response.ok) {
       const errorText = await response.text();
@@ -48,16 +124,21 @@ export async function apiGet<T = unknown>(endpoint: string): Promise<T> {
 }
 
 /**
- * Make a POST request to the API
+ * Make a POST request to the API with token refresh support
  */
-export async function apiPost<T = unknown>(endpoint: string, data: Record<string, unknown>, isFormUrlEncoded = false): Promise<T> {
+export async function apiPost<T = unknown>(
+  endpoint: string, 
+  data: Record<string, unknown>, 
+  isFormUrlEncoded = false,
+  retrying = false
+): Promise<T> {
   const tokenData = getToken();
   const headers: HeadersInit = {
     'Content-Type': isFormUrlEncoded ? 'application/x-www-form-urlencoded' : 'application/json',
   };
   
   if (tokenData) {
-    headers['Authorization'] = `${tokenData.type} ${tokenData.token}`;
+    headers['Authorization'] = `${tokenData.type} ${tokenData.accessToken}`;
   }
   
   let body: string;
@@ -85,6 +166,18 @@ export async function apiPost<T = unknown>(endpoint: string, data: Record<string
       body,
     });
     
+    // Handle 401 with token refresh
+    if (response.status === 401 && tokenData?.refreshToken && !retrying) {
+      const newToken = await handleTokenRefresh();
+      
+      if (newToken) {
+        // Retry the request with the new token
+        return apiPost<T>(endpoint, data, isFormUrlEncoded, true);
+      } else {
+        throw new Error('Session expired. Please login again.');
+      }
+    }
+    
     if (!response.ok) {
       const errorText = await response.text();
       console.error(`API Error (${response.status}):`, errorText);
@@ -102,7 +195,7 @@ export async function apiPost<T = unknown>(endpoint: string, data: Record<string
 /**
  * Login function that returns a token
  */
-export async function login(username: string, password: string): Promise<{ access_token: string; token_type: string }> {
+export async function login(username: string, password: string): Promise<{ access_token: string; refresh_token: string; token_type: string }> {
   try {
     console.log("Making login request with username:", username);
     
@@ -111,15 +204,22 @@ export async function login(username: string, password: string): Promise<{ acces
       password,
     };
     
-    const result = await apiPost<{ access_token: string; token_type: string }>('/api/v1/auth/login', formData, true);
+    const result = await apiPost<{ access_token: string; refresh_token: string; token_type: string }>(
+      '/api/v1/auth/login', 
+      formData, 
+      true
+    );
     
     console.log("Login API response successful:", { 
       tokenReceived: !!result.access_token,
+      refreshTokenReceived: !!result.refresh_token,
       tokenType: result.token_type 
     });
     
     // Store token type for future requests
-    if (typeof window !== 'undefined' && result.token_type) {
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('access_token', result.access_token);
+      localStorage.setItem('refresh_token', result.refresh_token);
       localStorage.setItem('token_type', result.token_type);
     }
     

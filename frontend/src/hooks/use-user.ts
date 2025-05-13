@@ -1,8 +1,8 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { getCookie } from 'cookies-next';
 import { apiGet } from '@/lib/api/client';
+import { refreshAccessToken } from '@/lib/api/auth';
 
 export type User = {
   id: string;

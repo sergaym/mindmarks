@@ -5,7 +5,7 @@ import logging
 
 from app.api.v1.schemas.token import Token
 from app.api.v1.schemas.user import UserCreate, UserRead
-from app.api.v1.services import user_service
+from app.services import user_service
 from app.core.config import settings
 from app.core.security import create_access_token, verify_password
 from app.db.base import DBSession

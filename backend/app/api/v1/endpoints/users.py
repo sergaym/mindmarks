@@ -4,7 +4,7 @@ from uuid import UUID
 
 from app.core.security import get_current_active_superuser, get_current_user
 from app.api.v1.schemas.user import UserRead, UserUpdate
-from app.services import user_service
+from app.services.user_service import UserService
 from app.core.security import get_password_hash
 from app.db.base import DBSession
 from app.db.models import User
@@ -42,9 +42,12 @@ def update_user_me(
     if "password" in update_data:
         update_data["hashed_password"] = get_password_hash(update_data.pop("password"))
     
+    # Create user service
+    user_svc = UserService(db)
+    
     # Check if email already exists for another user
     if "email" in update_data:
-        existing_user = user_service.get_user_by_email(db, update_data["email"])
+        existing_user = user_svc.get_user_by_email(update_data["email"])
         if existing_user and existing_user.id != current_user.id:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
@@ -54,7 +57,7 @@ def update_user_me(
     # Only update if there are changes
     if update_data:
         # Pass the dictionary directly
-        updated_user = user_service.update_user(db, UUID(current_user.id), update_data)
+        updated_user = user_svc.update_user(UUID(current_user.id), update_data)
         if updated_user:
             return UserRead.from_orm(updated_user)
     
@@ -70,9 +73,10 @@ def read_users(
     current_user: User = Depends(get_current_active_superuser),
 ):
     """
-    Retrieve users - superuser only
+    Retrieve all users - superuser only
     """
-    users = user_service.get_users(db, skip, limit)
+    user_svc = UserService(db)
+    users = user_svc.get_users(skip, limit)
     return [UserRead.from_orm(user) for user in users]
 
 
@@ -85,11 +89,14 @@ def read_user_by_id(
     """
     Get a specific user by id - superuser only
     """
-    user = user_service.get_user_by_id(db, user_id)
+    user_svc = UserService(db)
+    user = user_svc.get_user_by_id(user_id)
     
     if not user:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail="User not found"
         )
     
-    return UserRead.from_orm(user) 
+    return UserRead.from_orm(user)
+
+

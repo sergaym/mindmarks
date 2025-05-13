@@ -117,6 +117,23 @@ def refresh_access_token(
         )
 
 
+@router.post("/logout", status_code=status.HTTP_200_OK)
+def logout(session: DBSession, refresh_token: str = Body(..., embed=True)):
+    """
+    Logout a user by revoking their refresh token
+    """
+    user_svc = UserService(session)
+    
+    # Revoke the refresh token
+    revoked = user_svc.revoke_refresh_token(refresh_token)
+    if not revoked:
+        # We don't want to give hints about valid/invalid tokens
+        # So just return success regardless
+        pass
+    
+    return {"message": "Successfully logged out"}
+
+
 @router.post("/register", response_model=UserRead, status_code=status.HTTP_201_CREATED)
 def register_new_user(user_in: UserCreate, session: DBSession):
     """

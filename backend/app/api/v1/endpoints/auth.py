@@ -55,6 +55,67 @@ def login_for_access_token(
     }
 
 
+@router.post("/refresh", response_model=Token)
+def refresh_access_token(
+    session: DBSession, refresh_token: str = Body(..., embed=True)
+):
+    """
+    Get a new access token using a refresh token
+    """
+    user_svc = UserService(session)
+    
+    # Validate the refresh token from JWT perspective
+    try:
+        payload = validate_refresh_token(refresh_token)
+        user_id = payload.get("sub")
+        
+        # Verify token exists in database and is not revoked
+        db_token = user_svc.get_refresh_token(refresh_token)
+        if not db_token:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Invalid or revoked refresh token",
+            )
+        
+        # Verify user exists and is active
+        user = user_svc.get_user_by_id(user_id)
+        if not user or not user.is_active:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Invalid user or inactive user",
+            )
+        
+        # Revoke the used refresh token (token rotation)
+        user_svc.revoke_refresh_token(refresh_token)
+        
+        # Generate new access token
+        access_token_expires = timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
+        access_token = create_access_token(
+            subject=str(user.id), expires_delta=access_token_expires
+        )
+        
+        # Generate new refresh token
+        new_refresh_token = create_refresh_token(subject=str(user.id))
+        
+        # Store new refresh token in database
+        user_svc.create_refresh_token(user.id, new_refresh_token)
+        
+        return {
+            "access_token": access_token,
+            "refresh_token": new_refresh_token,
+            "token_type": "bearer"
+        }
+    
+    except HTTPException as e:
+        raise e
+    except Exception as e:
+        logger.error(f"Refresh token error: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid refresh token",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+
 
 @router.post("/register", response_model=UserRead, status_code=status.HTTP_201_CREATED)
 def register_new_user(user_in: UserCreate, session: DBSession):

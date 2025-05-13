@@ -5,7 +5,7 @@ import logging
 
 from app.api.v1.schemas.token import Token
 from app.api.v1.schemas.user import UserCreate, UserRead
-from app.services import user_service
+from app.services.user_service import UserService
 from app.core.config import settings
 from app.core.security import create_access_token, verify_password
 from app.db.base import DBSession
@@ -21,7 +21,8 @@ def login_for_access_token(
     """
     OAuth2 compatible token login, get an access token for future requests
     """
-    user = user_service.get_user_by_email(session, form_data.username)
+    user_svc = UserService(session)
+    user = user_svc.get_user_by_email(form_data.username)
     
     if not user or not verify_password(form_data.password, user.hashed_password):
         raise HTTPException(
@@ -48,8 +49,10 @@ def register_new_user(user_in: UserCreate, session: DBSession):
     """
     Create new user
     """
+    user_svc = UserService(session)
+    
     # Check if user already exists
-    existing_user = user_service.get_user_by_email(session, user_in.email)
+    existing_user = user_svc.get_user_by_email(user_in.email)
     if existing_user:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -61,7 +64,7 @@ def register_new_user(user_in: UserCreate, session: DBSession):
         logger.info(f"Creating superuser account for email: {user_in.email}")
     
     # Create new user through service layer
-    new_user = user_service.create_user(session, user_in)
+    new_user = user_svc.create_user(user_in)
     if not new_user:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,

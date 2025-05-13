@@ -21,12 +21,23 @@ export function useUser() {
       setIsLoading(true);
       
       try {
-        // Check if there's an auth token in cookies or localStorage
-        const hasAuthToken = 
-          getCookie('auth_token') || 
-          (typeof window !== 'undefined' && localStorage.getItem('access_token'));
+        // Check if there's an auth token in localStorage
+        const hasAccessToken = 
+          typeof window !== 'undefined' && localStorage.getItem('access_token');
         
-        if (!hasAuthToken) {
+        const hasRefreshToken = 
+          typeof window !== 'undefined' && localStorage.getItem('refresh_token');
+        
+        // If no access token but have refresh token, try to refresh
+        if (!hasAccessToken && hasRefreshToken) {
+          const refreshResult = await refreshAccessToken();
+          if (!refreshResult) {
+            setUser(null);
+            setIsLoading(false);
+            return;
+          }
+        } else if (!hasAccessToken && !hasRefreshToken) {
+          // No tokens at all
           setUser(null);
           setIsLoading(false);
           return;
@@ -50,11 +61,15 @@ export function useUser() {
       } catch (err) {
         console.error('Failed to fetch user data:', err);
         
-        // Handle case when token is expired or invalid
+        // Our client.ts should already handle token refresh on 401s,
+        // but we'll still handle cleanup here just in case
         if (err instanceof Error && err.message.includes('401')) {
+          console.log('Session expired, clearing tokens');
+          
           // Clear invalid auth data
           if (typeof window !== 'undefined') {
             localStorage.removeItem('access_token');
+            localStorage.removeItem('refresh_token');
             localStorage.removeItem('token_type');
           }
         }

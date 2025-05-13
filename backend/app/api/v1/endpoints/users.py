@@ -4,7 +4,7 @@ from uuid import UUID
 
 from app.core.security import get_current_active_superuser, get_current_user
 from app.api.v1.schemas.user import UserRead, UserUpdate
-from app.api.v1.services import user_service
+from app.services import user_service
 from app.core.security import get_password_hash
 from app.db.base import DBSession
 from app.db.models import User

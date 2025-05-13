@@ -89,11 +89,14 @@ def read_user_by_id(
     """
     Get a specific user by id - superuser only
     """
-    user = user_service.get_user_by_id(db, user_id)
+    user_svc = UserService(db)
+    user = user_svc.get_user_by_id(user_id)
     
     if not user:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND, detail="User not found"
         )
     
-    return UserRead.from_orm(user) 
+    return UserRead.from_orm(user)
+
+

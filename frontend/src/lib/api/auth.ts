@@ -216,8 +216,195 @@ export async function registerUser(email: string, password: string, name?: strin
     };
   }
 }
+
+/**
+ * Logout user
+ */
+export async function logoutUser(): Promise<AuthResult<{ success: boolean }>> {
+  try {
+    // Call logout endpoint to revoke the refresh token
+    // The cookie will be included automatically with credentials: 'include'
+    await apiRequest<{ message: string }>(
+      '/api/v1/auth/logout', 
+      'POST', 
+      {},
+      undefined,
+      'json'
+    );
+    
+    // Clear stored tokens
+    if (typeof window !== 'undefined') {
+      sessionStorage.removeItem('access_token');
+      sessionStorage.removeItem('token_expiry');
+      localStorage.removeItem('token_type');
+      
+      // Also clear the refresh token cookie by setting an expired one
+      await clearRefreshTokenCookie();
+    }
+    
+    return { 
+      success: true, 
+      data: { success: true } 
+    };
   } catch (err) {
-    console.error('Token validation error:', err);
-    return null;
+    console.error('Logout error:', err);
+    
+    // Still clear tokens even if API call fails
+    if (typeof window !== 'undefined') {
+      sessionStorage.removeItem('access_token');
+      sessionStorage.removeItem('token_expiry');
+      localStorage.removeItem('token_type');
+      await clearRefreshTokenCookie();
+    }
+    
+    // Even if the API call fails, we consider the logout successful on the client side
+    return {
+      success: true,
+      data: { success: true }
+    };
   }
-}; 
+}
+
+/**
+ * Check if token is about to expire and needs refreshing
+ * Returns true if token will expire within the buffer time
+ */
+export function isTokenExpiringSoon(bufferMinutes = 5): boolean {
+  try {
+    const tokenExpiry = sessionStorage.getItem('token_expiry');
+    if (!tokenExpiry) {
+      return true; // If we don't know when it expires, assume it's expiring soon
+    }
+    
+    const expiryTime = parseInt(tokenExpiry, 10) * 1000; // Convert to milliseconds
+    const currentTime = Date.now();
+    const bufferTime = bufferMinutes * 60 * 1000; // Convert minutes to milliseconds
+    
+    return expiryTime - currentTime < bufferTime;
+  } catch (err) {
+    console.error('Error checking token expiry:', err);
+    return true; // If there's an error, assume it's expiring soon
+  }
+}
+
+/**
+ * Refresh an access token using a refresh token from HttpOnly cookie
+ */
+export async function refreshAccessToken(): Promise<AuthResult<TokenResponse>> {
+  try {
+    // The refresh token is sent automatically via HttpOnly cookie
+    const response = await apiRequest<TokenResponse>(
+      '/api/v1/auth/refresh', 
+      'POST', 
+      {},
+      undefined,
+      'json'
+    );
+    
+    if (!response || !response.access_token) {
+      return { 
+        success: false, 
+        error: {
+          status: 401,
+          message: 'Failed to refresh token',
+          code: 'REFRESH_FAILED'
+        }
+      };
+    }
+    
+    // Update stored access token and expiry time
+    if (typeof window !== 'undefined') {
+      sessionStorage.setItem('access_token', response.access_token);
+      localStorage.setItem('token_type', response.token_type);
+      
+      // Update expiry time
+      const decodedToken = jwtDecode<JwtPayload>(response.access_token);
+      if (decodedToken.exp) {
+        sessionStorage.setItem('token_expiry', decodedToken.exp.toString());
+      }
+    }
+    
+    return { success: true, data: response };
+  } catch (err) {
+    console.error('Token refresh error:', err);
+    const error = err as ApiError;
+    return { 
+      success: false, 
+      error: {
+        status: error.status || 401,
+        message: error.message || 'Failed to refresh token',
+        code: 'REFRESH_FAILED'
+      }
+    };
+  }
+}
+
+/**
+ * Store refresh token in HttpOnly cookie via a dedicated backend endpoint
+ */
+async function setRefreshTokenCookie(refreshToken: string): Promise<void> {
+  try {
+    await fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL}/api/v1/auth/set-refresh-cookie`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ refresh_token: refreshToken }),
+      credentials: 'include', // Important for cookies
+    });
+  } catch (err) {
+    console.error('Error setting refresh token cookie:', err);
+    // Fallback to localStorage only if cookie setting fails
+    localStorage.setItem('refresh_token', refreshToken);
+  }
+}
+
+/**
+ * Clear refresh token cookie
+ */
+async function clearRefreshTokenCookie(): Promise<void> {
+  try {
+    await fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL}/api/v1/auth/clear-refresh-cookie`, {
+      method: 'POST',
+      credentials: 'include',
+    });
+    
+    // Also clear any fallback in localStorage
+    localStorage.removeItem('refresh_token');
+  } catch (err) {
+    console.error('Error clearing refresh token cookie:', err);
+    // Still remove from localStorage if clearing cookie fails
+    localStorage.removeItem('refresh_token');
+  }
+}
+
+/**
+ * Get the current access token from storage
+ * @internal Exported for testing
+ */
+export function __internal_getAccessToken(): string | null {
+  if (typeof window === 'undefined') return null;
+  
+  const accessToken = sessionStorage.getItem('access_token');
+  if (!accessToken) {
+    // Legacy support - check localStorage
+    return localStorage.getItem('access_token');
+  }
+  
+  return accessToken;
+}
+
+/**
+ * Get appropriate authentication headers
+ * @internal Exported for testing
+ */
+export function __internal_getAuthHeaders(): Record<string, string> {
+  const accessToken = __internal_getAccessToken();
+  const tokenType = localStorage.getItem('token_type') || 'Bearer';
+  
+  if (!accessToken) return {};
+  
+  return {
+    'Authorization': `${tokenType} ${accessToken}`
+  };
+} 

@@ -4,8 +4,15 @@ import { ArrowUpRight, BookOpen, Users } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Header } from "@/components/layout/header";
 import { Footer } from "@/components/layout/footer";
+import { useRouter } from "next/navigation";
 
 export default function AboutPage() {
+  const router = useRouter();
+
+  const handleStartReading = () => {
+    router.push("/login");
+  };
+
   return (
     <>
       <Header />
@@ -57,7 +64,7 @@ export default function AboutPage() {
             </div>
 
             <div className="mt-12 flex justify-center">
-              <Button className="rounded-lg">
+              <Button className="rounded-lg" onClick={handleStartReading}>
                 Start Reading <ArrowUpRight className="ml-2 h-4 w-4" />
               </Button>
             </div>

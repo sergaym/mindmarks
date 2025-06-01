@@ -81,8 +81,14 @@ export function RegisterForm() {
   return (
     <form onSubmit={handleSubmit} className="space-y-5">
       {error && (
-        <div className="p-3 rounded-lg bg-destructive/10 border border-destructive/30 text-destructive text-xs">
-          {error}
+        <div className="p-4 rounded-lg bg-destructive/10 border border-destructive/20 text-destructive">
+          <div className="flex items-start space-x-3">
+            <AlertCircle className="w-5 h-5 mt-0.5 flex-shrink-0" />
+            <div className="flex-1">
+              <p className="text-sm font-medium">Registration Error</p>
+              <p className="text-sm mt-1 text-destructive/90">{error}</p>
+            </div>
+          </div>
         </div>
       )}
       
@@ -147,6 +153,7 @@ export function RegisterForm() {
           disabled={isLoading}
           placeholder="••••••••"
         />
+        <PasswordRequirements password={password} show={password.length > 0} />
       </div>
       
       <div className="pt-2">

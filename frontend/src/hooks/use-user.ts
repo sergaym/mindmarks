@@ -1,8 +1,8 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { apiGet } from '@/lib/api/client';
-import { refreshAccessToken } from '@/lib/api/auth';
+import { apiClient, ApiError, AuthenticationError } from '@/lib/api/client';
+import { refreshAccessToken, isTokenExpiringSoon } from '@/lib/api/auth';
 
 export type User = {
   id: string;
@@ -19,32 +19,45 @@ export function useUser() {
   useEffect(() => {
     async function fetchUserData() {
       setIsLoading(true);
+      setError(null);
       
       try {
-        // Check if there's an auth token in localStorage
+        // Check if there's an access token
         const hasAccessToken = 
-          typeof window !== 'undefined' && localStorage.getItem('access_token');
+          typeof window !== 'undefined' && 
+          (sessionStorage.getItem('access_token') || localStorage.getItem('access_token'));
         
-        const hasRefreshToken = 
-          typeof window !== 'undefined' && localStorage.getItem('refresh_token');
-        
-        // If no access token but have refresh token, try to refresh
-        if (!hasAccessToken && hasRefreshToken) {
-          const refreshResult = await refreshAccessToken();
-          if (!refreshResult) {
-            setUser(null);
-            setIsLoading(false);
-            return;
-          }
-        } else if (!hasAccessToken && !hasRefreshToken) {
-          // No tokens at all
+        if (!hasAccessToken) {
+          // No access token available
           setUser(null);
           setIsLoading(false);
           return;
         }
         
-        // Fetch user data from the API
-        const userData = await apiGet<User>('/api/v1/users/me');
+        // Check if token needs refresh
+        if (isTokenExpiringSoon()) {
+          try {
+            const refreshResult = await refreshAccessToken();
+            if (!refreshResult.success) {
+              // Refresh failed, clear tokens
+              if (typeof window !== 'undefined') {
+                sessionStorage.removeItem('access_token');
+                localStorage.removeItem('access_token');
+                localStorage.removeItem('token_type');
+              }
+              setUser(null);
+              setIsLoading(false);
+              return;
+            }
+          } catch (refreshError) {
+            console.warn('Token refresh failed:', refreshError);
+            // Continue with existing token and let the API call handle it
+          }
+        }
+        
+        // Fetch user data from the API using the new client
+        const response = await apiClient.get<User>('/api/v1/users/me');
+        const userData = response.data;
         
         // Ensure full_name is set - use email username part if full_name is missing
         if (!userData.full_name && userData.email) {

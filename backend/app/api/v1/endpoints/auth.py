@@ -1,11 +1,18 @@
 from datetime import timedelta
-from fastapi import APIRouter, Depends, HTTPException, status, Body
+from fastapi import APIRouter, Depends, HTTPException, status, Body, BackgroundTasks
 from fastapi.security import OAuth2PasswordRequestForm
 import logging
 
 from app.api.v1.schemas.token import Token
 from app.api.v1.schemas.user import UserCreate, UserRead
+from app.api.v1.schemas.password_reset import (
+    ForgotPasswordRequest, 
+    ForgotPasswordResponse, 
+    ResetPasswordRequest, 
+    ResetPasswordResponse
+)
 from app.services.user_service import UserService
+from app.services.email_service import email_service
 from app.core.config import settings
 from app.core.security import create_access_token, verify_password, create_refresh_token, validate_refresh_token
 from app.db.base import DBSession

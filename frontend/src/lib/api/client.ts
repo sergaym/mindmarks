@@ -32,18 +32,38 @@ export class AuthenticationError extends ApiError {
   }
 }
 
+// Request configuration
+interface RequestConfig {
+  method?: 'GET' | 'POST' | 'PUT' | 'DELETE' | 'PATCH';
+  headers?: Record<string, string>;
+  body?: unknown;
+  timeout?: number;
+  retries?: number;
+  requiresAuth?: boolean;
+  contentType?: 'json' | 'form-urlencoded' | 'multipart';
+}
+
+// Response wrapper
+interface ApiResponse<T = unknown> {
+  data: T;
+  status: number;
+  headers: Headers;
+}
+
+// Token management
 let isRefreshing = false;
-// Queue of callbacks to be called after token refresh
-let refreshSubscribers: Array<(token: string) => void> = [];
+let refreshSubscribers: Array<(token: string | null) => void> = [];
 
 /**
- * Get the access token from localStorage
+ * Get the current access token
  */
-function getToken(): { accessToken: string, refreshToken: string, type: string } | null {
+function getAccessToken(): string | null {
   if (typeof window === 'undefined') return null;
   
-  const accessToken = localStorage.getItem('access_token');
-  const refreshToken = localStorage.getItem('refresh_token');
+  // Try sessionStorage first (preferred), then localStorage (fallback)
+  return sessionStorage.getItem('access_token') || localStorage.getItem('access_token');
+}
+
   const tokenType = localStorage.getItem('token_type') || 'Bearer';
   
   if (!accessToken) return null;

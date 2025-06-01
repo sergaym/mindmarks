@@ -3,9 +3,9 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
-import { ArrowRight, Loader2 } from "lucide-react";
+import { ArrowRight, Loader2, AlertCircle } from "lucide-react";
 import Link from "next/link";
-import { login } from "@/lib/api/client";
+import { loginUser } from "@/lib/api/auth";
 import { setCookie } from "cookies-next";
 
 export function SignInForm() {
@@ -21,32 +21,74 @@ export function SignInForm() {
     setIsLoading(true);
 
     try {
-      console.log("Attempting API login with:", email);
+      console.log("Attempting login with:", email);
 
-      // Call our API client login function
-      const result = await login(email, password);
+      // Use the enhanced auth API
+      const result = await loginUser(email, password);
       
-      console.log("Login successful, received token");
+      if (result.success) {
+        console.log("Login successful");
 
-      // Store token and email in localStorage for use across the app
-      localStorage.setItem('access_token', result.access_token);
-      localStorage.setItem('token_type', result.token_type);
-      localStorage.setItem('user_email', email);
-      
-      // Also set in cookie for middleware (server-side) access
-      // Set secure, httpOnly cookie that middleware can access
-      setCookie('auth_token', result.access_token, {
-        maxAge: 60 * 60 * 24 * 7, // 1 week
-        path: '/',
-        sameSite: 'strict',
-      });
-      
-      // Success - redirect to dashboard
-      console.log("Redirecting to dashboard...");
-      router.push("/dashboard");
+        // The loginUser function already handles token storage
+        // Just set the cookie for middleware compatibility
+        setCookie('auth_token', result.data.tokens.access_token, {
+          maxAge: 60 * 60 * 24 * 7, // 1 week
+          path: '/',
+          sameSite: 'strict',
+          secure: process.env.NODE_ENV === 'production',
+        });
+        
+        // Check for callback URL
+        const urlParams = new URLSearchParams(window.location.search);
+        const callbackUrl = urlParams.get('callbackUrl');
+        const redirectUrl = callbackUrl && callbackUrl.startsWith('/') ? callbackUrl : '/dashboard';
+        
+        console.log("Redirecting to:", redirectUrl);
+        router.push(redirectUrl);
+      } else {
+        // Provide user-friendly error messages based on error type
+        let errorMessage = result.error.message;
+        
+        // Enhance error messages for common scenarios
+        if (result.error.status === 401) {
+          if (errorMessage.toLowerCase().includes('incorrect email') || 
+              errorMessage.toLowerCase().includes('incorrect password') ||
+              errorMessage.toLowerCase().includes('incorrect username')) {
+            errorMessage = "The email or password you entered is incorrect. Please double-check your credentials and try again.";
+          } else if (errorMessage.toLowerCase().includes('user not found')) {
+            errorMessage = "No account found with this email address. Please check your email or create a new account.";
+          } else if (errorMessage.toLowerCase().includes('account disabled') || 
+                     errorMessage.toLowerCase().includes('account suspended')) {
+            errorMessage = "Your account has been disabled. Please contact support for assistance.";
+          } else {
+            errorMessage = "Authentication failed. Please check your email and password and try again.";
+          }
+        } else if (result.error.status === 429) {
+          errorMessage = "Too many login attempts. Please wait a moment before trying again.";
+        } else if (result.error.status >= 500) {
+          errorMessage = "We're experiencing technical difficulties. Please try again in a moment.";
+        } else if (!errorMessage || errorMessage.trim() === '') {
+          errorMessage = "Login failed. Please check your credentials and try again.";
+        }
+        
+        setError(errorMessage);
+      }
     } catch (error) {
       console.error("Login error:", error);
-      setError("Login failed. Please check your credentials and try again.");
+      
+      // Handle different types of errors
+      let errorMessage = "An unexpected error occurred. Please try again.";
+      
+      if (error instanceof Error) {
+        if (error.message.toLowerCase().includes('network') || 
+            error.message.toLowerCase().includes('fetch')) {
+          errorMessage = "Network error. Please check your internet connection and try again.";
+        } else if (error.message.toLowerCase().includes('timeout')) {
+          errorMessage = "Request timed out. Please try again.";
+        }
+      }
+      
+      setError(errorMessage);
     } finally {
       setIsLoading(false);
     }
@@ -55,8 +97,14 @@ export function SignInForm() {
   return (
     <form onSubmit={handleSubmit} className="space-y-5">
       {error && (
-        <div className="p-3 rounded-lg bg-destructive/10 border border-destructive/30 text-destructive text-xs">
-          {error}
+        <div className="p-4 rounded-lg bg-destructive/10 border border-destructive/20 text-destructive">
+          <div className="flex items-start space-x-3">
+            <AlertCircle className="w-5 h-5 mt-0.5 flex-shrink-0" />
+            <div className="flex-1">
+              <p className="text-sm font-medium">Sign In Error</p>
+              <p className="text-sm mt-1 text-destructive/90">{error}</p>
+            </div>
+          </div>
         </div>
       )}
       

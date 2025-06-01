@@ -24,6 +24,19 @@ class Settings(BaseSettings):
     DB_PORT: str
     DB_DATABASE: str
     DB_SSLMODE: Optional[str] = "require"
+    
+    # Email Configuration for Password Recovery
+    # For custom domains on Zoho, try both smtp.zoho.com and smtppro.zoho.com
+    SMTP_SERVER: Optional[str] = "smtp.zoho.com"
+    SMTP_PORT: int = 587
+    SMTP_USERNAME: Optional[str] = None
+    SMTP_PASSWORD: Optional[str] = None
+    FROM_EMAIL: Optional[str] = "sergio.ayala@eseaemefund.xyz"
+    FRONTEND_URL: str = "http://localhost:3000"
+    
+    # Alternative SMTP settings for fallback
+    SMTP_USE_TLS: bool = True
+    SMTP_USE_SSL: bool = False
 
     @property
     def DATABASE_URL(self) -> str:

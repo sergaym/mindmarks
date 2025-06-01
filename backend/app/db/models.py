@@ -19,7 +19,9 @@ from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 import uuid
-from datetime import datetime
+from datetime import datetime, timedelta
+import secrets
+import hashlib
 
 Base = declarative_base()
 
@@ -105,4 +107,41 @@ class RefreshToken(Base):
     
     # Relationship to user
     user = relationship("User", back_populates="refresh_tokens")
+
+
+class PasswordResetToken(Base):
+    __tablename__ = "password_reset_tokens"
+    
+    id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
+    user_email = Column(String, index=True, nullable=False)
+    token_hash = Column(String, nullable=False)  # Store hashed token for security
+    expires_at = Column(DateTime, nullable=False)
+    used = Column(Boolean, default=False)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    
+    __table_args__ = (
+        Index('password_reset_tokens_user_email_idx', 'user_email'),
+        Index('password_reset_tokens_expires_at_idx', 'expires_at'),
+    )
+    
+    @classmethod
+    def create_token(cls, user_email: str, expires_in_hours: int = 1):
+        """Create a new password reset token"""
+        token = secrets.token_urlsafe(32)
+        token_hash = hashlib.sha256(token.encode()).hexdigest()
+        
+        return cls(
+            user_email=user_email.lower(),
+            token_hash=token_hash,
+            expires_at=datetime.utcnow() + timedelta(hours=expires_in_hours)
+        ), token
+    
+    def verify_token(self, token: str) -> bool:
+        """Verify if the provided token matches this record"""
+        token_hash = hashlib.sha256(token.encode()).hexdigest()
+        return (
+            self.token_hash == token_hash and
+            not self.used and
+            datetime.utcnow() < self.expires_at
+        )
 

@@ -78,10 +78,36 @@ async function apiRequest<T>(
 
   // Handle errors
   if (!response.ok) {
-    const errorText = await response.text();
+    let errorMessage: string;
+    let errorCode: string | undefined;
+
+    try {
+      // Try to parse JSON error response
+      const errorData = await response.json();
+      
+      // Handle different API error response formats
+      if (errorData.detail) {
+        // FastAPI format: {"detail": "message"}
+        errorMessage = errorData.detail;
+      } else if (errorData.message) {
+        // Custom format: {"message": "text", "code": "ERROR_CODE"}
+        errorMessage = errorData.message;
+        errorCode = errorData.code;
+      } else if (typeof errorData === 'string') {
+        errorMessage = errorData;
+      } else {
+        // Fallback for unknown JSON structure
+        errorMessage = JSON.stringify(errorData);
+      }
+    } catch {
+      // If JSON parsing fails, use response text
+      errorMessage = await response.text() || `HTTP ${response.status} Error`;
+    }
+
     const error: ApiError = {
       status: response.status,
-      message: errorText,
+      message: errorMessage,
+      code: errorCode
     };
     throw error;
   }

@@ -74,21 +74,32 @@ export function useUser() {
       } catch (err) {
         console.error('Failed to fetch user data:', err);
         
-        // Our client.ts should already handle token refresh on 401s,
-        // but we'll still handle cleanup here just in case
-        if (err instanceof Error && err.message.includes('401')) {
-          console.log('Session expired, clearing tokens');
+        if (err instanceof AuthenticationError) {
+          console.log('Authentication failed, clearing tokens');
           
           // Clear invalid auth data
           if (typeof window !== 'undefined') {
+            sessionStorage.removeItem('access_token');
             localStorage.removeItem('access_token');
-            localStorage.removeItem('refresh_token');
             localStorage.removeItem('token_type');
+            
+            // Redirect to login if not already there
+            if (window.location.pathname !== '/login') {
+              window.location.href = '/login';
+            }
           }
+          
+          setError('Authentication failed. Please log in again.');
+          setUser(null);
+        } else if (err instanceof ApiError) {
+          console.error('API Error:', err.message);
+          setError(`Failed to fetch user data: ${err.message}`);
+          setUser(null);
+        } else {
+          console.error('Unexpected error:', err);
+          setError('An unexpected error occurred');
+          setUser(null);
         }
-        
-        setError('Failed to fetch user data');
-        setUser(null);
       } finally {
         setIsLoading(false);
       }
@@ -99,16 +110,16 @@ export function useUser() {
 
   // For demo/development purposes - create a fallback user when no authentication is available
   useEffect(() => {
-    if (!user && !isLoading && process.env.NODE_ENV === 'development') {
-      // Only use fallback data in development
+    if (!user && !isLoading && !error && process.env.NODE_ENV === 'development') {
+      // Only use fallback data in development when there's no error
       setUser({
-        id: 'user1',
-        full_name: 'Sergio Ayala',
-        email: 'sergioayala.contacto@gmail.com',
-        avatar: '/me.png',
+        id: 'dev-user-1',
+        full_name: 'Development User',
+        email: 'dev@mindmarks.com',
+        avatar: undefined,
       });
     }
-  }, [user, isLoading]);
+  }, [user, isLoading, error]);
 
   return {
     user,

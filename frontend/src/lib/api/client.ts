@@ -382,3 +382,51 @@ async function makeRequest<T = unknown>(
 
   throw new NetworkError('Max retries exceeded');
 }
+
+// Convenience methods
+export const apiClient = {
+  /**
+   * GET request
+   */
+  get: <T = unknown>(endpoint: string, config?: Omit<RequestConfig, 'method' | 'body'>) =>
+    makeRequest<T>(endpoint, { ...config, method: 'GET' }),
+
+  /**
+   * POST request
+   */
+  post: <T = unknown>(endpoint: string, data?: unknown, config?: Omit<RequestConfig, 'method'>) =>
+    makeRequest<T>(endpoint, { ...config, method: 'POST', body: data }),
+
+  /**
+   * PUT request
+   */
+  put: <T = unknown>(endpoint: string, data?: unknown, config?: Omit<RequestConfig, 'method'>) =>
+    makeRequest<T>(endpoint, { ...config, method: 'PUT', body: data }),
+
+  /**
+   * DELETE request
+   */
+  delete: <T = unknown>(endpoint: string, config?: Omit<RequestConfig, 'method' | 'body'>) =>
+    makeRequest<T>(endpoint, { ...config, method: 'DELETE' }),
+
+  /**
+   * PATCH request
+   */
+  patch: <T = unknown>(endpoint: string, data?: unknown, config?: Omit<RequestConfig, 'method'>) =>
+    makeRequest<T>(endpoint, { ...config, method: 'PATCH', body: data }),
+};
+
+// Legacy exports for backward compatibility
+export const login = async (email: string, password: string) => {
+  const response = await apiClient.post('/api/v1/auth/login', {
+    username: email,
+    password,
+  }, { 
+    requiresAuth: false, 
+    contentType: 'form-urlencoded' 
+  });
+  
+  return response.data;
+};
+
+export default apiClient; 

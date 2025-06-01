@@ -31,6 +31,15 @@ export type AuthResult<T> =
   | { success: true; data: T } 
   | { success: false; error: ApiError };
 
+export interface PasswordResetRequest {
+  message: string;
+}
+
+export interface PasswordResetData {
+  token: string;
+  password: string;
+}
+
 /**
  * Makes a request to the API with the appropriate content type
  */
@@ -433,4 +442,134 @@ export function __internal_getAuthHeaders(): Record<string, string> {
   return {
     'Authorization': `${tokenType} ${accessToken}`
   };
+}
+
+/**
+ * Request password reset (forgot password)
+ */
+export async function requestPasswordReset(email: string): Promise<AuthResult<PasswordResetRequest>> {
+  try {
+    console.log('Requesting password reset for:', email);
+
+    const response = await apiRequest<PasswordResetRequest>(
+      '/api/v1/auth/forgot-password', 
+      'POST', 
+      {
+        email: email.toLowerCase().trim(),
+      },
+      undefined,
+      'json'
+    );
+
+    return {
+      success: true,
+      data: response,
+    };
+  } catch (err) {
+    console.error('Password reset request failed:', err);
+    
+    const error = err as ApiError;
+    let message = 'Failed to send password reset email. Please try again.';
+    
+    // Handle specific error cases
+    if (error.status === 404) {
+      // For security, don't reveal if email exists or not
+      message = 'If an account with this email exists, you will receive password reset instructions.';
+    } else if (error.status === 429) {
+      message = 'Too many password reset requests. Please wait before trying again.';
+    } else if (error.status >= 500) {
+      message = 'Server error occurred. Please try again later.';
+    } else if (error.message) {
+      // Try to extract user-friendly message from API error
+      try {
+        const parsedError = JSON.parse(error.message);
+        if (parsedError.detail && typeof parsedError.detail === 'string') {
+          message = parsedError.detail;
+        }
+      } catch {
+        // If parsing fails, use the raw message if it's user-friendly
+        if (error.message.length < 200 && !error.message.includes('{')) {
+          message = error.message;
+        }
+      }
+    }
+
+    return {
+      success: false,
+      error: {
+        message,
+        status: error.status || 500,
+      },
+    };
+  }
+}
+
+/**
+ * Reset password with token
+ */
+export async function resetPassword(token: string, newPassword: string): Promise<AuthResult<{ message: string }>> {
+  try {
+    console.log('Resetting password with token');
+
+    const response = await apiRequest<{ message: string }>(
+      '/api/v1/auth/reset-password', 
+      'POST', 
+      {
+        token: token.trim(),
+        password: newPassword,
+      },
+      undefined,
+      'json'
+    );
+
+    return {
+      success: true,
+      data: response,
+    };
+  } catch (err) {
+    console.error('Password reset failed:', err);
+    
+    const error = err as ApiError;
+    let message = 'Failed to reset password. Please try again.';
+    
+    // Handle specific error cases
+    if (error.status === 400) {
+      if (error.message.toLowerCase().includes('token')) {
+        message = 'Invalid or expired reset token. Please request a new password reset.';
+      } else if (error.message.toLowerCase().includes('password')) {
+        message = 'Password does not meet requirements. Please ensure it\'s at least 8 characters long.';
+      } else {
+        message = 'Invalid request. Please check your information and try again.';
+      }
+    } else if (error.status === 404) {
+      message = 'Reset token not found. Please request a new password reset.';
+    } else if (error.status === 410) {
+      message = 'Reset token has expired. Please request a new password reset.';
+    } else if (error.status === 429) {
+      message = 'Too many password reset attempts. Please wait before trying again.';
+    } else if (error.status >= 500) {
+      message = 'Server error occurred. Please try again later.';
+    } else if (error.message) {
+      // Try to extract user-friendly message from API error
+      try {
+        const parsedError = JSON.parse(error.message);
+        if (parsedError.detail && typeof parsedError.detail === 'string') {
+          message = parsedError.detail;
+        }
+      } catch {
+        // If parsing fails, use the raw message if it's user-friendly
+        if (error.message.length < 200 && !error.message.includes('{')) {
+          message = error.message;
+        }
+      }
+    }
+
+    return {
+      success: false,
+      error: {
+        message,
+        status: error.status || 500,
+      },
+    };
+  }
 } 

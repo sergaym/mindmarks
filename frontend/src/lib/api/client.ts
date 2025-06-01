@@ -1,11 +1,37 @@
 /**
- * API client for making requests to the backend with token refresh support
+ * Enhanced API client with comprehensive error handling, retry logic, and token management
  */
-import { refreshAccessToken } from './auth';
+import { refreshAccessToken, isTokenExpiringSoon } from './auth';
 
-const API_URL = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:8000'; 
+const API_URL = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:8000';
 
-// Flag to prevent multiple refresh token requests at the same time
+// Error types for better error handling
+export class ApiError extends Error {
+  constructor(
+    public status: number,
+    public message: string,
+    public code?: string,
+    public details?: unknown
+  ) {
+    super(message);
+    this.name = 'ApiError';
+  }
+}
+
+export class NetworkError extends Error {
+  constructor(message: string, public originalError?: Error) {
+    super(message);
+    this.name = 'NetworkError';
+  }
+}
+
+export class AuthenticationError extends ApiError {
+  constructor(message: string, code?: string) {
+    super(401, message, code);
+    this.name = 'AuthenticationError';
+  }
+}
+
 let isRefreshing = false;
 // Queue of callbacks to be called after token refresh
 let refreshSubscribers: Array<(token: string) => void> = [];

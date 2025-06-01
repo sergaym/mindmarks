@@ -64,64 +64,62 @@ function getAccessToken(): string | null {
   return sessionStorage.getItem('access_token') || localStorage.getItem('access_token');
 }
 
+/**
+ * Get authentication headers
+ */
+function getAuthHeaders(): Record<string, string> {
+  const token = getAccessToken();
   const tokenType = localStorage.getItem('token_type') || 'Bearer';
   
-  if (!accessToken) return null;
-  return { accessToken, refreshToken: refreshToken || '', type: tokenType };
+  if (!token) return {};
+  
+  return {
+    'Authorization': `${tokenType} ${token}`
+  };
 }
 
 /**
- * Subscribe a callback to be executed when tokens refresh
+ * Add request to refresh queue
  */
-function subscribeTokenRefresh(callback: (token: string) => void): void {
+function subscribeTokenRefresh(callback: (token: string | null) => void): void {
   refreshSubscribers.push(callback);
 }
 
 /**
- * Notify all subscribers about new token
+ * Process refresh queue
  */
-function onTokenRefreshed(token: string): void {
-  refreshSubscribers.forEach((callback) => callback(token));
+function onTokenRefreshed(token: string | null): void {
+  refreshSubscribers.forEach(callback => callback(token));
   refreshSubscribers = [];
 }
 
 /**
- * Handle token refresh for 401 errors
+ * Handle token refresh with queue management
  */
 async function handleTokenRefresh(): Promise<string | null> {
+  if (isRefreshing) {
+    // Wait for ongoing refresh
+    return new Promise((resolve) => {
+      subscribeTokenRefresh(resolve);
+    });
+  }
+
+  isRefreshing = true;
+
   try {
-    if (!isRefreshing) {
-      isRefreshing = true;
-      
-      const refreshResult = await refreshAccessToken();
-      
-      if (refreshResult.success && refreshResult.data.access_token) {
-        onTokenRefreshed(refreshResult.data.access_token);
-        return refreshResult.data.access_token;
-      }
-      
-      // If refresh failed, clear all tokens
-      localStorage.removeItem('access_token');
-      localStorage.removeItem('refresh_token');
-      localStorage.removeItem('token_type');
-      
-      // Redirect to login page if in browser
-      if (typeof window !== 'undefined') {
-        window.location.href = '/login?error=session_expired';
-      }
-      
-      return null;
+    const result = await refreshAccessToken();
+    
+    if (result.success) {
+      const newToken = result.data.access_token;
+      onTokenRefreshed(newToken);
+      return newToken;
     } else {
-      // If already refreshing, return a promise that resolves when refreshed
-      return new Promise<string>((resolve) => {
-        subscribeTokenRefresh((token: string) => {
-          resolve(token);
-        });
-      });
+      onTokenRefreshed(null);
+      throw new AuthenticationError('Token refresh failed', result.error.code);
     }
   } catch (error) {
-    console.error('Error refreshing token:', error);
-    return null;
+    onTokenRefreshed(null);
+    throw error;
   } finally {
     isRefreshing = false;
   }

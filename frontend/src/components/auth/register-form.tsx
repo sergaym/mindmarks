@@ -3,9 +3,10 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
-import { ArrowRight, Loader2 } from "lucide-react";
+import { ArrowRight, Loader2, AlertCircle } from "lucide-react";
 import Link from "next/link";
 import { registerUser } from "@/lib/api/auth";
+import { PasswordRequirements } from "@/components/ui/password-requirements";
 
 export function RegisterForm() {
   const router = useRouter();
@@ -22,13 +23,56 @@ export function RegisterForm() {
 
     try {
       // Call the centralized registration function
-      await registerUser(email, password, fullName);
+      const result = await registerUser(email, password, fullName);
 
-      // Redirect to login page after successful registration
-      router.push("/login?registered=true");
+      if (result.success) {
+        // Redirect to login page after successful registration
+        router.push("/login?registered=true");
+      } else {
+        // Provide user-friendly error messages based on error type
+        let errorMessage = result.error.message;
+        
+        // Enhance error messages for common scenarios
+        if (result.error.status === 400) {
+          if (errorMessage.toLowerCase().includes('email already') || 
+              errorMessage.toLowerCase().includes('user already exists')) {
+            errorMessage = "An account with this email address already exists. Please use a different email or sign in instead.";
+          } else if (errorMessage.toLowerCase().includes('password')) {
+            errorMessage = "Password does not meet requirements. Please ensure it's at least 8 characters long.";
+          } else if (errorMessage.toLowerCase().includes('email') && 
+                     errorMessage.toLowerCase().includes('invalid')) {
+            errorMessage = "Please enter a valid email address.";
+          } else {
+            errorMessage = "Registration failed. Please check your information and try again.";
+          }
+        } else if (result.error.status === 409) {
+          errorMessage = "An account with this email address already exists. Please sign in instead.";
+        } else if (result.error.status === 429) {
+          errorMessage = "Too many registration attempts. Please wait a moment before trying again.";
+        } else if (result.error.status >= 500) {
+          errorMessage = "We're experiencing technical difficulties. Please try again in a moment.";
+        } else if (!errorMessage || errorMessage.trim() === '') {
+          errorMessage = "Registration failed. Please check your information and try again.";
+        }
+        
+        setError(errorMessage);
+      }
     } catch (error) {
-      setError(error instanceof Error ? error.message : "An unexpected error occurred");
       console.error("Registration error:", error);
+      
+      // Handle different types of errors
+      let errorMessage = "An unexpected error occurred during registration. Please try again.";
+      
+      if (error instanceof Error) {
+        if (error.message.toLowerCase().includes('network') || 
+            error.message.toLowerCase().includes('fetch')) {
+          errorMessage = "Network error. Please check your internet connection and try again.";
+        } else if (error.message.toLowerCase().includes('timeout')) {
+          errorMessage = "Request timed out. Please try again.";
+        }
+      }
+      
+      setError(errorMessage);
     } finally {
       setIsLoading(false);
     }

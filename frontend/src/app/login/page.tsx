@@ -12,17 +12,27 @@ import { ThemeProvider } from "next-themes";
 function LoginContent() {
   const searchParams = useSearchParams();
   const registered = searchParams.get('registered');
+  const autoLoginFailed = searchParams.get('autoLoginFailed');
   const [showSuccessMessage, setShowSuccessMessage] = useState(false);
+  const [showAutoLoginFailedMessage, setShowAutoLoginFailedMessage] = useState(false);
 
   useEffect(() => {
     if (registered === 'true') {
-      setShowSuccessMessage(true);
-      const timer = setTimeout(() => {
-        setShowSuccessMessage(false);
-      }, 5000);
-      return () => clearTimeout(timer);
+      if (autoLoginFailed === 'true') {
+        setShowAutoLoginFailedMessage(true);
+        const timer = setTimeout(() => {
+          setShowAutoLoginFailedMessage(false);
+        }, 7000);
+        return () => clearTimeout(timer);
+      } else {
+        setShowSuccessMessage(true);
+        const timer = setTimeout(() => {
+          setShowSuccessMessage(false);
+        }, 5000);
+        return () => clearTimeout(timer);
+      }
     }
-  }, [registered]);
+  }, [registered, autoLoginFailed]);
 
   return (
     <div className="w-full max-w-md backdrop-blur-sm px-6 py-8 rounded-xl border border-border relative z-10 shadow-2xl bg-card/30">
@@ -54,6 +64,12 @@ function LoginContent() {
       {showSuccessMessage && (
         <div className="mb-4 p-3 rounded-lg bg-emerald-50 border border-emerald-200 text-emerald-700 text-sm dark:bg-emerald-900/20 dark:text-emerald-300 dark:border-emerald-800/50">
           Account created successfully! You can now sign in.
+        </div>
+      )}
+
+      {showAutoLoginFailedMessage && (
+        <div className="mb-4 p-3 rounded-lg bg-amber-50 border border-amber-200 text-amber-700 text-sm dark:bg-amber-900/20 dark:text-amber-300 dark:border-amber-800/50">
+          Account created successfully! Please sign in with your credentials to continue.
         </div>
       )}
       

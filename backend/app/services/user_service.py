@@ -4,9 +4,9 @@ from datetime import datetime, timedelta
 from typing import Dict, List, Optional, Union
 from uuid import UUID
 from sqlalchemy.orm import Session
-from sqlalchemy import or_
+from sqlalchemy import or_, and_
 
-from app.db.models import User, RefreshToken
+from app.db.models import User, RefreshToken, PasswordResetToken
 from app.core.security import get_password_hash, verify_password
 from app.api.v1.schemas.user import UserCreate, UserUpdate
 from app.core.config import settings
@@ -151,6 +151,95 @@ class UserService:
         
         self.db.commit()
         return result
+
+    def create_password_reset_token(self, email: str) -> Optional[str]:
+        """
+        Create a password reset token for a user
+        Returns the token string if successful, None if user doesn't exist
+        """
+        user = self.get_user_by_email(email)
+        if not user:
+            return None
+        
+        # Invalidate any existing tokens for this user
+        self.db.query(PasswordResetToken).filter(
+            and_(
+                PasswordResetToken.user_email == email.lower(),
+                PasswordResetToken.used == False,
+                PasswordResetToken.expires_at > datetime.utcnow()
+            )
+        ).update({"used": True})
+        
+        # Create new reset token
+        reset_record, reset_token = PasswordResetToken.create_token(email.lower())
+        self.db.add(reset_record)
+        self.db.commit()
+        
+        logger.info(f"Password reset token created for user: {email}")
+        return reset_token
+    
+    def verify_and_use_reset_token(self, token: str, new_password: str) -> bool:
+        """
+        Verify and use a password reset token to change the user's password
+        Returns True if successful, False otherwise
+        """
+        # Find valid reset token
+        reset_record = self.db.query(PasswordResetToken).filter(
+            and_(
+                PasswordResetToken.used == False,
+                PasswordResetToken.expires_at > datetime.utcnow()
+            )
+        ).first()
+        
+        if not reset_record:
+            logger.warning("Invalid or expired reset token attempted")
+            return False
+        
+        # Verify token
+        if not reset_record.verify_token(token):
+            logger.warning("Invalid reset token verification failed")
+            return False
+        
+        # Find user
+        user = self.get_user_by_email(reset_record.user_email)
+        if not user:
+            # Mark token as used and return False
+            reset_record.used = True
+            self.db.commit()
+            logger.error(f"User not found for reset token: {reset_record.user_email}")
+            return False
+        
+        # Update user password
+        user.hashed_password = get_password_hash(new_password)
+        user.updated_at = datetime.utcnow()
+        
+        # Mark token as used
+        reset_record.used = True
+        
+        # Revoke all existing refresh tokens for security
+        self.revoke_all_user_refresh_tokens(UUID(user.id))
+        
+        # Commit changes
+        self.db.commit()
+        
+        logger.info(f"Password successfully reset for user: {user.email}")
+        return True
+    
+    def cleanup_expired_reset_tokens(self) -> int:
+        """
+        Cleanup expired password reset tokens
+        Returns the number of deleted tokens
+        """
+        deleted_count = self.db.query(PasswordResetToken).filter(
+            PasswordResetToken.expires_at < datetime.utcnow()
+        ).delete()
+        
+        self.db.commit()
+        
+        if deleted_count > 0:
+            logger.info(f"Cleaned up {deleted_count} expired password reset tokens")
+        
+        return deleted_count
 
     @staticmethod
     def is_active_user(user: User) -> bool:

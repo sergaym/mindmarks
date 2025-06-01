@@ -5,8 +5,10 @@ import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { ArrowRight, Loader2, AlertCircle } from "lucide-react";
 import Link from "next/link";
-import { registerUser } from "@/lib/api/auth";
+import { registerUser, loginUser } from "@/lib/api/auth";
 import { PasswordRequirements } from "@/components/ui/password-requirements";
+import { setCookie } from "cookies-next";
+import { validateRegistrationForm } from "@/lib/validation";
 
 export function RegisterForm() {
   const router = useRouter();
@@ -19,21 +21,26 @@ export function RegisterForm() {
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
+
+    // Client-side validation
+    const validation = validateRegistrationForm(email, password, fullName);
+    if (!validation.isValid) {
+      setError(validation.message || 'Please check your information and try again.');
+      return;
+    }
+
     setIsLoading(true);
 
     try {
-      // Call the centralized registration function
-      const result = await registerUser(email, password, fullName);
+      // Step 1: Register the user
+      const registrationResult = await registerUser(email, password, fullName);
 
-      if (result.success) {
-        // Redirect to login page after successful registration
-        router.push("/login?registered=true");
-      } else {
-        // Provide user-friendly error messages based on error type
-        let errorMessage = result.error.message;
+      if (!registrationResult.success) {
+        // Handle registration failure
+        let errorMessage = registrationResult.error.message;
         
         // Enhance error messages for common scenarios
-        if (result.error.status === 400) {
+        if (registrationResult.error.status === 400) {
           if (errorMessage.toLowerCase().includes('email already') || 
               errorMessage.toLowerCase().includes('user already exists')) {
             errorMessage = "An account with this email address already exists. Please use a different email or sign in instead.";
@@ -45,20 +52,44 @@ export function RegisterForm() {
           } else {
             errorMessage = "Registration failed. Please check your information and try again.";
           }
-        } else if (result.error.status === 409) {
+        } else if (registrationResult.error.status === 409) {
           errorMessage = "An account with this email address already exists. Please sign in instead.";
-        } else if (result.error.status === 429) {
+        } else if (registrationResult.error.status === 429) {
           errorMessage = "Too many registration attempts. Please wait a moment before trying again.";
-        } else if (result.error.status >= 500) {
+        } else if (registrationResult.error.status >= 500) {
           errorMessage = "We're experiencing technical difficulties. Please try again in a moment.";
         } else if (!errorMessage || errorMessage.trim() === '') {
           errorMessage = "Registration failed. Please check your information and try again.";
         }
         
         setError(errorMessage);
+        return;
+      }
+
+      // Step 2: Automatically log the user in after successful registration
+      console.log("Registration successful, logging user in automatically...");
+      const loginResult = await loginUser(email, password);
+
+      if (loginResult.success) {
+        console.log("Auto-login successful, redirecting to dashboard...");
+
+        // Set the cookie for middleware compatibility
+        setCookie('auth_token', loginResult.data.tokens.access_token, {
+          maxAge: 60 * 60 * 24 * 7, // 1 week
+          path: '/',
+          sameSite: 'strict',
+          secure: process.env.NODE_ENV === 'production',
+        });
+        
+        // Redirect directly to dashboard
+        router.push("/dashboard");
+      } else {
+        // Auto-login failed, redirect to login page with success message
+        console.log("Auto-login failed, redirecting to login page...");
+        router.push("/login?registered=true&autoLoginFailed=true");
       }
     } catch (error) {
-      console.error("Registration error:", error);
+      console.error("Registration/login error:", error);
       
       // Handle different types of errors
       let errorMessage = "An unexpected error occurred during registration. Please try again.";

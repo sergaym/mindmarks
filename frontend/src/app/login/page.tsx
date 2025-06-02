@@ -25,12 +25,12 @@ function LoginContent() {
         }, 7000);
         return () => clearTimeout(timer);
       } else {
-        setShowSuccessMessage(true);
-        const timer = setTimeout(() => {
-          setShowSuccessMessage(false);
-        }, 5000);
-        return () => clearTimeout(timer);
-      }
+      setShowSuccessMessage(true);
+      const timer = setTimeout(() => {
+        setShowSuccessMessage(false);
+      }, 5000);
+      return () => clearTimeout(timer);
+    }
     }
   }, [registered, autoLoginFailed]);
 

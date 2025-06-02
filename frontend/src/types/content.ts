@@ -8,6 +8,38 @@ export interface User {
   image: string;
 }
 
+// Rich content page structure (Notion-style)
+export interface ContentPage {
+  id: string;
+  title: string;
+  type: ContentType;
+  url?: string;
+  tags: string[];
+  status: 'planned' | 'in-progress' | 'completed' | 'archived';
+  priority: 'low' | 'medium' | 'high';
+  
+  // Rich metadata
+  author?: string;
+  publishedDate?: Date;
+  estimatedReadTime?: number; // in minutes
+  rating?: number; // 1-5 stars
+  progress?: number; // 0-100%
+  
+  // Rich content (Plate editor)
+  content: any[]; // Plate editor JSON content
+  summary?: string;
+  keyTakeaways?: string[];
+  
+  // System fields
+  createdAt: Date;
+  updatedAt: Date;
+  createdBy: User;
+  lastEditedBy: User;
+  isPublic: boolean;
+  collaborators: User[];
+}
+
+// Simplified version for dashboard/kanban view
 export interface ContentItem {
   id: string;
   name: string;

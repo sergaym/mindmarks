@@ -17,7 +17,6 @@ import {
   KanbanProvider,
 } from '@/components/ui/kibo-ui/kanban';
 import { useState, useEffect, useCallback } from 'react';
-import { useRouter } from 'next/navigation';
 import { useContent } from '@/hooks/use-content';
 import { useKanban, contentTypeIcons, dateFormatter, shortDateFormatter } from '@/hooks/use-kanban';
 import { ContentItem, ContentType, User } from '@/types/content';
@@ -31,7 +30,6 @@ import { ErrorState } from '@/components/ui/error-state';
 import { useBreadcrumb } from './layout';
 
 export default function DashboardPage() {
-  const router = useRouter();
   const { setBreadcrumb } = useBreadcrumb();
   const [itemToDelete, setItemToDelete] = useState<string | null>(null);
   

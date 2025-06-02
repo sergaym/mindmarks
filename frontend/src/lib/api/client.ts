@@ -3,7 +3,7 @@
  */
 import { refreshAccessToken, isTokenExpiringSoon } from './auth';
 
-const API_URL = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:8000';
+const API_URL = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:8000'; 
 
 // Error types for better error handling
 export class ApiError extends Error {
@@ -105,10 +105,10 @@ async function handleTokenRefresh(): Promise<string | null> {
   }
 
   isRefreshing = true;
-
+      
   try {
     const result = await refreshAccessToken();
-    
+      
     if (result.success) {
       const newToken = result.data.access_token;
       onTokenRefreshed(newToken);
@@ -163,7 +163,7 @@ function prepareRequestBody(data: unknown, contentType: string): string | FormDa
             formData.append(key, value);
           } else {
             formData.append(key, String(value));
-          }
+    }
         });
         return formData;
       }
@@ -178,7 +178,7 @@ function prepareRequestBody(data: unknown, contentType: string): string | FormDa
  * Make API request with enhanced error handling and retry logic
  */
 async function makeRequest<T = unknown>(
-  endpoint: string,
+  endpoint: string, 
   config: RequestConfig = {}
 ): Promise<ApiResponse<T>> {
   const {
@@ -198,7 +198,7 @@ async function makeRequest<T = unknown>(
     } catch (error) {
       // If refresh fails, continue with the request - let the 401 handler deal with it
       console.warn('Proactive token refresh failed:', error);
-    }
+  }
   }
 
   const url = `${API_URL}${endpoint}`;
@@ -231,13 +231,13 @@ async function makeRequest<T = unknown>(
         body: requestBody,
         credentials: 'include',
         signal: controller.signal
-      });
-
+    });
+    
       // Handle authentication errors
       if (response.status === 401 && requiresAuth && attempt === 0) {
         try {
-          const newToken = await handleTokenRefresh();
-          if (newToken) {
+      const newToken = await handleTokenRefresh();
+      if (newToken) {
             // Retry with new token
             const newHeaders = { ...requestHeaders, ...getAuthHeaders() };
             const retryResponse = await fetch(url, {
@@ -264,9 +264,9 @@ async function makeRequest<T = unknown>(
                   errorCode = errorData.code;
                 } else if (typeof errorData === 'string') {
                   errorMessage = errorData;
-                } else {
+      } else {
                   errorMessage = JSON.stringify(errorData);
-                }
+      }
               } catch {
                 try {
                   errorMessage = await retryResponse.text() || `HTTP ${retryResponse.status} Error`;
@@ -280,8 +280,8 @@ async function makeRequest<T = unknown>(
                 errorMessage,
                 errorCode
               );
-            }
-            
+    }
+    
             return {
               data: await retryResponse.json(),
               status: retryResponse.status,
@@ -381,8 +381,8 @@ async function makeRequest<T = unknown>(
   }
 
   throw new NetworkError('Max retries exceeded');
-}
-
+    }
+    
 // Convenience methods
 export const apiClient = {
   /**

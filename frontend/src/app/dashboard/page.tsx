@@ -1,6 +1,5 @@
 'use client';
 
-import { AppSidebar } from "@/components/layout/sidebar/app-sidebar"
 import {
   Breadcrumb,
   BreadcrumbItem,
@@ -9,12 +8,6 @@ import {
   BreadcrumbPage,
   BreadcrumbSeparator,
 } from "@/components/ui/breadcrumb"
-import { Separator } from "@/components/ui/separator"
-import {
-  SidebarInset,
-  SidebarProvider,
-  SidebarTrigger,
-} from "@/components/ui/sidebar"
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import {
   KanbanBoard,
@@ -23,27 +16,26 @@ import {
   KanbanHeader,
   KanbanProvider,
 } from '@/components/ui/kibo-ui/kanban';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
+import { useRouter } from 'next/navigation';
 import { useContent } from '@/hooks/use-content';
 import { useKanban, contentTypeIcons, dateFormatter, shortDateFormatter } from '@/hooks/use-kanban';
 import { ContentItem, ContentType, User } from '@/types/content';
 import { AddContentButton } from '@/components/content/add-content-button';
 import { DeleteButton } from '@/components/content/delete-button';
 import { DeleteConfirmationDialog } from '@/components/content/delete-confirmation-dialog';
+import { DashboardHeader } from '@/components/dashboard/dashboard-header';
+import { DashboardContent } from '@/components/dashboard/dashboard-content';
+import { LoadingState } from '@/components/ui/loading-state';
+import { ErrorState } from '@/components/ui/error-state';
+import { useBreadcrumb } from './layout';
 
-export default function Page() {
+export default function DashboardPage() {
+  const router = useRouter();
+  const { setBreadcrumb } = useBreadcrumb();
   const [itemToDelete, setItemToDelete] = useState<string | null>(null);
   
-  // Debug dialog state
-  useEffect(() => {
-    if (itemToDelete) {
-      console.log('Dialog should open with item:', itemToDelete);
-    } else {
-      console.log('Dialog should close');
-    }
-  }, [itemToDelete]);
-  
-  // Initialize hooks for content and Kanban management
+  // Initialize hooks for content management
   const { 
     content, 
     status, 
@@ -51,12 +43,29 @@ export default function Page() {
     updateContent,
     addContent,
     removeContent,
-    getCurrentUser 
+    getCurrentUser
   } = useContent();
   
   const { 
     columns,
   } = useKanban();
+
+  // Set breadcrumb for this page
+  useEffect(() => {
+    setBreadcrumb(
+      <Breadcrumb>
+        <BreadcrumbList>
+          <BreadcrumbItem>
+            <BreadcrumbLink href="/dashboard">Dashboard</BreadcrumbLink>
+          </BreadcrumbItem>
+          <BreadcrumbSeparator />
+          <BreadcrumbItem>
+            <BreadcrumbPage>My Content</BreadcrumbPage>
+          </BreadcrumbItem>
+        </BreadcrumbList>
+      </Breadcrumb>
+    );
+  }, [setBreadcrumb]);
 
   // Handler for when items are moved between columns
   const handleDataChange = async (updatedContent: ContentItem[]) => {

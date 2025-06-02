@@ -2,6 +2,7 @@
 
 import { ReactNode } from 'react';
 import { ThemeProvider } from 'next-themes';
+import { UserProvider } from '@/contexts/user-context';
 
 interface ProvidersProps {
   children: ReactNode;
@@ -11,7 +12,9 @@ interface ProvidersProps {
 export function Providers({ children }: ProvidersProps) {
   return (
     <ThemeProvider attribute="class" enableSystem>
-      {children}
+      <UserProvider>
+        {children}
+      </UserProvider>
     </ThemeProvider>
   );
 } 

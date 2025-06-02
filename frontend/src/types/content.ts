@@ -1,6 +1,6 @@
 // Content and Kanban types for the application
 
-export type ContentType = 'book' | 'article' | 'video' | 'podcast' | 'other';
+export type ContentType = 'book' | 'article' | 'video' | 'podcast' | 'course' | 'research' | 'note' | 'other';
 
 export interface User {
   id: string;

@@ -51,7 +51,20 @@ export interface ContentItem {
   description?: string;
   tags?: string[];
   url?: string;
+  progress?: number;
+  priority?: 'low' | 'medium' | 'high';
   [key: string]: unknown; // Allow additional properties for compatibility with Kanban component
+}
+
+// Content template for different types
+export interface ContentTemplate {
+  type: ContentType;
+  title: string;
+  description: string;
+  icon: string;
+  defaultContent: any[]; // Plate editor template
+  suggestedTags: string[];
+  estimatedTimeRange?: [number, number]; // min/max minutes
 }
 
 export interface KanbanColumn {
@@ -69,4 +82,18 @@ export interface ApiResponse<T> {
   data?: T;
   error?: string;
   status: Status;
+}
+
+// Content page metadata for forms
+export interface ContentPageMetadata {
+  title: string;
+  type: ContentType;
+  url?: string;
+  tags: string[];
+  status: 'planned' | 'in-progress' | 'completed' | 'archived';
+  priority: 'low' | 'medium' | 'high';
+  author?: string;
+  publishedDate?: Date;
+  estimatedReadTime?: number;
+  isPublic: boolean;
 } 

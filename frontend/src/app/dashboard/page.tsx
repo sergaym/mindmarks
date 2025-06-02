@@ -122,103 +122,17 @@ export default function DashboardPage() {
 
   // Main content
   return (
-    <SidebarProvider>
-      <AppSidebar />
-      <SidebarInset>
-        <header className="flex h-16 shrink-0 items-center gap-2 border-b transition-[width,height] ease-linear group-has-[[data-collapsible=icon]]/sidebar-wrapper:h-12">
-          <div className="flex items-center gap-2 px-4">
-            <SidebarTrigger className="-ml-1" />
-            <Separator orientation="vertical" className="mr-2 h-4" />
-            <Breadcrumb>
-              <BreadcrumbList>
-                <BreadcrumbItem>
-                  <BreadcrumbLink href="/dashboard">Dashboard</BreadcrumbLink>
-                </BreadcrumbItem>
-                <BreadcrumbSeparator />
-                <BreadcrumbItem>
-                  <BreadcrumbPage>My Content</BreadcrumbPage>
-                </BreadcrumbItem>
-              </BreadcrumbList>
-            </Breadcrumb>
-          </div>
-        </header>
-        <div className="flex flex-1 flex-col gap-4 p-4">
-          <div className="flex items-center justify-between">
-            <h1 className="text-2xl font-bold">My Content</h1>
-            <AddContentButton
-              onAdd={handleAddContent}
-              currentUser={getCurrentUser()}
-            />
-          </div>
-          
-          <div className="h-[calc(100vh-160px)] w-full overflow-x-auto md:overflow-x-auto px-1 py-2">
-            <div className="w-full md:min-w-[900px]">
-              <KanbanProvider
-                onDataChange={handleDataChange}
-                columns={columns}
-                data={content}
-              >
-                {(column) => (
-                  <KanbanBoard key={column.id} id={column.id} className="mb-4 md:mb-0">
-                    <KanbanHeader>
-                      <div className="flex items-center gap-2 px-2 py-3">
-                        <div
-                          className="h-2.5 w-2.5 rounded-full"
-                          style={{ backgroundColor: column.color }}
-                        />
-                        <span className="font-medium">{column.name}</span>
-                        <span className="ml-1 rounded-full bg-muted/50 px-2 py-0.5 text-xs text-muted-foreground">
-                          {content.filter(item => item.column === column.id).length}
-                        </span>
-                      </div>
-                    </KanbanHeader>
-                    <KanbanCards id={column.id}>
-                      {(item: ContentItem) => (
-                        <KanbanCard
-                          key={item.id}
-                          id={item.id}
-                          name={item.name}
-                          column={column.id}
-                          className="group hover:bg-card/80"
-                        >
-                          <div className="flex items-start justify-between gap-2">
-                            <div className="flex flex-col gap-1">
-                              <div className="flex items-center gap-2">
-                                <span className="text-base">{contentTypeIcons[item.type] || "📄"}</span>
-                                <p className="m-0 flex-1 font-medium text-sm">
-                                  {item.name}
-                                </p>
-                              </div>
-                            </div>
-                            <div className="flex items-center gap-2">
-                              <div data-no-drag="true">
-                                <DeleteButton 
-                                  onDelete={() => handleRemoveContent(item.id)}
-                                />
-                              </div>
-                              {item.owner && (
-                                <Avatar className="h-6 w-6 shrink-0">
-                                  <AvatarImage src={item.owner.image} alt={item.owner.name} />
-                                  <AvatarFallback>
-                                    {item.owner.name?.slice(0, 2)}
-                                  </AvatarFallback>
-                                </Avatar>
-                              )}
-                            </div>
-                          </div>
-                          <p className="m-0 mt-2 text-xs text-muted-foreground">
-                            {shortDateFormatter.format(item.startAt)} - {item.endAt ? dateFormatter.format(item.endAt) : "Present"}
-                          </p>
-                        </KanbanCard>
-                      )}
-                    </KanbanCards>
-                  </KanbanBoard>
-                )}
-              </KanbanProvider>
-            </div>
-          </div>
-        </div>
-      </SidebarInset>
+    <div className="flex flex-1 flex-col gap-4 p-4 overflow-hidden">
+      <DashboardHeader
+        onAddContent={handleAddContent}
+        currentUser={getCurrentUser()}
+      />
+      
+      <DashboardContent
+        content={content}
+        onDataChange={handleDataChange}
+        onRemoveContent={handleRemoveContent}
+      />
       
       {/* Delete Confirmation Dialog */}
       <DeleteConfirmationDialog
@@ -227,6 +141,6 @@ export default function DashboardPage() {
         onConfirm={confirmDelete}
         itemId={itemToDelete}
       />
-    </SidebarProvider>
+    </div>
   );
 }

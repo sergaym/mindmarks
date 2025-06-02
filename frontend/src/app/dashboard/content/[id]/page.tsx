@@ -120,3 +120,111 @@ export default function ContentPageView() {
     }
   }, [contentPage, setBreadcrumb]);
 
+  // Save content changes
+  const handleContentChange = async (content: any[]) => {
+    if (!contentPage) return;
+    
+    setIsSaving(true);
+    try {
+      // TODO: Replace with actual API call
+      await new Promise(resolve => setTimeout(resolve, 500));
+      
+      setContentPage(prev => prev ? { ...prev, content, updatedAt: new Date() } : null);
+      setLastSaved(new Date());
+    } catch (error) {
+      console.error('Failed to save content:', error);
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  // Update metadata
+  const handleMetadataUpdate = async (metadata: Partial<ContentPageMetadata>) => {
+    if (!contentPage) return;
+    
+    setIsSaving(true);
+    try {
+      // TODO: Replace with actual API call
+      await new Promise(resolve => setTimeout(resolve, 300));
+      
+      setContentPage(prev => prev ? { ...prev, ...metadata, updatedAt: new Date() } : null);
+      setLastSaved(new Date());
+    } catch (error) {
+      console.error('Failed to update metadata:', error);
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  // Loading state
+  if (isLoading) {
+    return (
+      <div className="flex flex-1 flex-col gap-4 p-4">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-4">
+            <Skeleton className="h-8 w-8 rounded-md" />
+            <Skeleton className="h-8 w-64" />
+          </div>
+          <div className="flex items-center gap-2">
+            <Skeleton className="h-8 w-20" />
+            <Skeleton className="h-8 w-8" />
+          </div>
+        </div>
+        
+        <div className="space-y-6">
+          <Skeleton className="h-12 w-3/4" />
+          <div className="space-y-4">
+            <Skeleton className="h-4 w-full" />
+            <Skeleton className="h-4 w-5/6" />
+            <Skeleton className="h-4 w-4/5" />
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (!contentPage) {
+    return (
+      <div className="flex flex-1 flex-col items-center justify-center">
+        <div className="text-center">
+          <h1 className="text-2xl font-semibold mb-2">Content not found</h1>
+          <p className="text-muted-foreground mb-4">The content page you're looking for doesn't exist.</p>
+          <Button onClick={() => router.push('/dashboard')}>
+            <ArrowLeft className="w-4 h-4 mr-2" />
+            Back to Dashboard
+          </Button>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex flex-1 flex-col">
+      {/* Content */}
+      <div className="flex-1 overflow-y-auto">
+        {/* Content Header */}
+        <ContentHeader
+          contentPage={contentPage}
+          onUpdate={handleMetadataUpdate}
+        />
+
+        {/* Main Editor */}
+        <div className="px-6 pb-20">
+          <ContentEditor
+            content={contentPage.content}
+            onChange={handleContentChange}
+            placeholder="Start writing your notes..."
+          />
+        </div>
+      </div>
+
+      {/* Metadata Panel */}
+      <ContentMetadataPanel
+        contentPage={contentPage}
+        isOpen={showMetadataPanel}
+        onClose={() => setShowMetadataPanel(false)}
+        onUpdate={handleMetadataUpdate}
+      />
+    </div>
+  );
+} 

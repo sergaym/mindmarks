@@ -18,7 +18,7 @@ import {
 
 import { cn } from '@/lib/utils';
 
-import { Toolbar } from '@/components/ui/toolbar';
+import { Toolbar } from '@/components/editor/ui/core/toolbar';
 
 type FloatingToolbarProps = React.ComponentProps<typeof Toolbar> & {
   state?: FloatingToolbarState;

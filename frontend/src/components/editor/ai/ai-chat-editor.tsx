@@ -67,22 +67,24 @@ import {
   TodoMarkerStatic,
 } from '@/components/editor/elements/indent/indent-todo-marker-static';
 
-import { BlockquoteElementStatic } from '@/components/ui/blockquote-element-static';
-import { CalloutElementStatic } from '@/components/ui/callout-element-static';
-import { CodeBlockElementStatic } from '@/components/ui/code-block-element-static';
+import { 
+  BlockquoteElementStatic,
+  CalloutElementStatic,
+  CodeBlockElementStatic,
+  CodeLineElementStatic,
+  ColumnElementStatic,
+  ColumnGroupElementStatic,
+  DateElement,
+  EquationElementStatic,
+  HeadingElementStatic,
+  InlineEquationElementStatic,
+} from '@/components/editor/ui/elements';
+import { EditorStatic } from '@/components/editor/ui/core';
 import { CodeLeaf } from '@/components/editor/elements/leaves/code-leaf';
-import { CodeLineElementStatic } from '@/components/ui/code-line-element-static';
 import { CodeSyntaxLeaf } from '@/components/editor/elements/leaves/code-syntax-leaf';
-import { ColumnElementStatic } from '@/components/ui/column-element-static';
-import { ColumnGroupElementStatic } from '@/components/ui/column-group-element-static';
-import { DateElement } from '@/components/ui/date-element';
-import { EditorStatic } from '@/components/ui/editor-static';
-import { EquationElementStatic } from '@/components/ui/equation-element-static';
-import { HeadingElementStatic } from '@/components/ui/heading-element-static';
 import { HighlightLeaf } from '@/components/editor/elements/leaves/highlight-leaf';
 import { HrElement } from '@/components/editor/elements/content/hr-element';
 import { ImageElement } from '@/components/editor/elements/media/image-element';
-import { InlineEquationElementStatic } from '@/components/ui/inline-equation-element-static';
 import { KbdLeaf } from '@/components/editor/elements/leaves/kbd-leaf';
 import { LinkElement } from '@/components/editor/elements/content/link-element';
 import { MediaAudioElement } from '@/components/editor/elements/media/media-audio-element';

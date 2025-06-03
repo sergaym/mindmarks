@@ -8,6 +8,27 @@ export interface User {
   image: string;
 }
 
+// Type for editor content structure (Plate editor)
+// Plate editor uses a specific structure with type and children
+export type PlateTextNode = {
+  text: string;
+  bold?: boolean;
+  italic?: boolean;
+  underline?: boolean;
+  strikethrough?: boolean;
+  code?: boolean;
+  [key: string]: unknown;
+};
+
+export type PlateElementNode = {
+  type: string; // 'p', 'h1', 'h2', 'ul', 'li', etc.
+  children: Array<PlateTextNode | PlateElementNode>;
+  [key: string]: unknown;
+};
+
+// Single editor content element for Plate
+export type EditorContent = PlateElementNode;
+
 // Rich content page structure (Notion-style)
 export interface ContentPage {
   id: string;
@@ -26,7 +47,7 @@ export interface ContentPage {
   progress?: number; // 0-100%
   
   // Rich content (Plate editor)
-  content: any[]; // Plate editor JSON content
+  content: EditorContent[]; // Plate editor JSON content
   summary?: string;
   keyTakeaways?: string[];
   
@@ -62,7 +83,7 @@ export interface ContentTemplate {
   title: string;
   description: string;
   icon: string;
-  defaultContent: any[]; // Plate editor template
+  defaultContent: EditorContent[]; // Plate editor template
   suggestedTags: string[];
   estimatedTimeRange?: [number, number]; // min/max minutes
 }

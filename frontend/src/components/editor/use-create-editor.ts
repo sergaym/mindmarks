@@ -78,17 +78,17 @@ import { TableElement, TableRowElement, TableCellElement, TableCellHeaderElement
 import { ToggleElement } from '@/components/editor/elements/interactive';
 import { withPlaceholders } from '@/components/editor/ui';
 
-// UI Elements that don't have organized structure yet
-import { BlockquoteElement } from '@/components/ui/blockquote-element';
-import { CalloutElement } from '@/components/ui/callout-element';
-import { CodeBlockElement } from '@/components/ui/code-block-element';
-import { CodeLineElement } from '@/components/ui/code-line-element';
-import { ColumnElement } from '@/components/ui/column-element';
-import { ColumnGroupElement } from '@/components/ui/column-group-element';
-import { DateElement } from '@/components/ui/date-element';
-import { EquationElement } from '@/components/ui/equation-element';
-import { HeadingElement } from '@/components/ui/heading-element';
-import { InlineEquationElement } from '@/components/ui/inline-equation-element';
+// UI Elements that are now properly organized in editor/ui
+import { BlockquoteElement } from '@/components/editor/ui/elements/blockquote-element';
+import { CalloutElement } from '@/components/editor/ui/elements/callout-element';
+import { CodeBlockElement } from '@/components/editor/ui/elements/code-block-element';
+import { CodeLineElement } from '@/components/editor/ui/elements/code-line-element';
+import { ColumnElement } from '@/components/editor/ui/elements/column-element';
+import { ColumnGroupElement } from '@/components/editor/ui/elements/column-group-element';
+import { DateElement } from '@/components/editor/ui/elements/date-element';
+import { EquationElement } from '@/components/editor/ui/elements/equation-element';
+import { HeadingElement } from '@/components/editor/ui/elements/heading-element';
+import { InlineEquationElement } from '@/components/editor/ui/elements/inline-equation-element';
 
 export const viewComponents = {
   [AudioPlugin.key]: MediaAudioElement,

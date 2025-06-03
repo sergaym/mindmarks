@@ -8,7 +8,7 @@ import { Plate } from '@udecode/plate/react';
 
 import { useCreateEditor } from '@/components/editor/use-create-editor';
 import { SettingsDialog } from '@/components/editor/settings';
-import { Editor, EditorContainer } from '@/components/ui/editor';
+import { Editor, EditorContainer } from '@/components/editor/ui/core';
 
 export function PlateEditor() {
   const editor = useCreateEditor();

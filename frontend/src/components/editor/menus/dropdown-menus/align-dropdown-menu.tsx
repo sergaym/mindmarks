@@ -22,7 +22,7 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { STRUCTURAL_TYPES } from '@/components/editor/transforms';
 
-import { ToolbarButton } from '@/components/ui/toolbar';
+import { ToolbarButton } from '@/components/editor/ui/core/toolbar';
 
 const items = [
   {

@@ -8,10 +8,11 @@ import {
 } from '@udecode/plate-emoji/react';
 import { Smile } from 'lucide-react';
 
-import { emojiCategoryIcons, emojiSearchIcons } from '@/components/ui/emoji-icons';
-import { EmojiPicker } from '@/components/ui/emoji-picker';
-import { EmojiToolbarDropdown } from '@/components/ui/emoji-toolbar-dropdown';
-import { ToolbarButton } from '@/components/ui/toolbar';
+import { emojiCategoryIcons, emojiSearchIcons } from '@/components/editor/ui/emoji/emoji-icons';
+import { EmojiPicker } from '@/components/editor/ui/emoji/emoji-picker';
+import { EmojiToolbarDropdown } from '@/components/editor/ui/emoji/emoji-toolbar-dropdown';
+import { ToolbarButton } from '@/components/editor/ui/core/toolbar';
+
 type EmojiDropdownMenuProps = {
   options?: EmojiDropdownMenuOptions;
 } & React.ComponentPropsWithoutRef<typeof ToolbarButton>;

@@ -60,7 +60,7 @@ import {
   insertInlineElement,
 } from '@/components/editor/transforms';
 
-import { ToolbarButton, ToolbarMenuGroup } from '@/components/ui/toolbar';
+import { ToolbarButton, ToolbarMenuGroup } from '@/components/editor/ui/core/toolbar';
 
 type Group = {
   group: string;

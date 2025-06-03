@@ -15,7 +15,7 @@ import {
 
 import { DEFAULT_COLORS, DEFAULT_CUSTOM_COLORS } from '../../ui/color-constants';
 import { ColorPicker } from '../../ui/color-picker';
-import { ToolbarButton } from '@/components/ui/toolbar';
+import { ToolbarButton } from '@/components/editor/ui/core/toolbar';
 
 type ColorDropdownMenuProps = {
   nodeType: string;

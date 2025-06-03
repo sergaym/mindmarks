@@ -22,7 +22,7 @@ import { TrailingBlockPlugin } from '@udecode/plate-trailing-block';
 
 import { FixedToolbarPlugin } from '@/components/editor/plugins/fixed-toolbar-plugin';
 import { FloatingToolbarPlugin } from '@/components/editor/plugins/floating-toolbar-plugin';
-import { SuggestionBelowNodes } from '@/components/ui/suggestion-line-break';
+import { SuggestionBelowNodes } from '@/components/editor/collaboration/suggestion-line-break';
 
 import { aiPlugins } from './ai-plugins';
 import { alignPlugin } from './align-plugin';
@@ -80,6 +80,7 @@ export const viewPlugins = [
   discussionPlugin,
   commentsPlugin,
   suggestionPlugin.configure({
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     render: { belowNodes: SuggestionBelowNodes as any },
   }),
 ] as const;
@@ -105,6 +106,7 @@ export const editorPlugins = [
   cursorOverlayPlugin,
   ...blockMenuPlugins,
   ...dndPlugins,
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   EmojiPlugin.configure({ options: { data: emojiMartData as any } }),
   exitBreakPlugin,
   resetBlockTypePlugin,

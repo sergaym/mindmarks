@@ -60,7 +60,7 @@ import { ModeDropdownMenu } from '../menus/dropdown-menus/mode-dropdown-menu';
 import { OutdentToolbarButton } from './buttons/outdent-toolbar-button';
 import { TableDropdownMenu } from '../elements/table/table-dropdown-menu';
 import { ToggleToolbarButton } from './buttons/toggle-toolbar-button';
-import { ToolbarGroup } from '@/components/ui/toolbar';
+import { ToolbarGroup } from '@/components/editor/ui/core/toolbar';
 import { TurnIntoDropdownMenu } from '../menus/dropdown-menus/turn-into-dropdown-menu';
 
 export function FixedToolbarButtons() {

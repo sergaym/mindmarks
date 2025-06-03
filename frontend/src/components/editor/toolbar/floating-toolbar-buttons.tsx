@@ -26,7 +26,7 @@ import { LinkToolbarButton } from './buttons/link-toolbar-button';
 import { MarkToolbarButton } from './buttons/mark-toolbar-button';
 import { MoreDropdownMenu } from '../menus/dropdown-menus/more-dropdown-menu';
 import { SuggestionToolbarButton } from './buttons/suggestion-toolbar-button';
-import { ToolbarGroup } from '@/components/ui/toolbar';
+import { ToolbarGroup } from '@/components/editor/ui/core/toolbar';
 import { TurnIntoDropdownMenu } from '../menus/dropdown-menus/turn-into-dropdown-menu';
 
 export function FloatingToolbarButtons() {

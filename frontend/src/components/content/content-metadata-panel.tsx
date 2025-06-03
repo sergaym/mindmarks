@@ -7,7 +7,6 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
 import { 
   Select, 
   SelectContent, 
@@ -19,8 +18,7 @@ import {
   Sheet, 
   SheetContent, 
   SheetHeader, 
-  SheetTitle, 
-  SheetClose 
+  SheetTitle
 } from '@/components/ui/sheet';
 import { Switch } from '@/components/ui/switch';
 import { Calendar } from '@/components/ui/calendar';
@@ -28,12 +26,10 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { 
   X, 
   Calendar as CalendarIcon, 
-  Star, 
   Plus,
   Globe,
   Lock
 } from 'lucide-react';
-import { cn } from '@/lib/utils';
 import { format } from 'date-fns';
 
 interface ContentMetadataPanelProps {
@@ -158,7 +154,7 @@ export function ContentMetadataPanel({
             <Label htmlFor="status">Status</Label>
             <Select
               value={formData.status}
-              onValueChange={(value: any) => 
+              onValueChange={(value: 'planned' | 'in-progress' | 'completed' | 'archived') => 
                 setFormData(prev => ({ ...prev, status: value }))
               }
             >
@@ -179,7 +175,7 @@ export function ContentMetadataPanel({
             <Label htmlFor="priority">Priority</Label>
             <Select
               value={formData.priority}
-              onValueChange={(value: any) => 
+              onValueChange={(value: 'low' | 'medium' | 'high') => 
                 setFormData(prev => ({ ...prev, priority: value }))
               }
             >

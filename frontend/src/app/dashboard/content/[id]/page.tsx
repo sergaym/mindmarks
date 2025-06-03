@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import { ContentPage, ContentPageMetadata } from '@/types/content';
+import { ContentPage, ContentPageMetadata, EditorContent } from '@/types/content';
 import { getTemplateByType } from '@/lib/content-templates';
 import { useUser } from '@/hooks/use-user';
 import { ContentMetadataPanel } from '@/components/content/content-metadata-panel';
@@ -30,9 +30,7 @@ export default function ContentPageView() {
   
   const [contentPage, setContentPage] = useState<ContentPage | null>(null);
   const [isLoading, setIsLoading] = useState(true);
-  const [isSaving, setIsSaving] = useState(false);
   const [showMetadataPanel, setShowMetadataPanel] = useState(false);
-  const [lastSaved, setLastSaved] = useState<Date | null>(null);
 
   // Load content page data
   useEffect(() => {
@@ -121,20 +119,16 @@ export default function ContentPageView() {
   }, [contentPage, setBreadcrumb]);
 
   // Save content changes
-  const handleContentChange = async (content: any[]) => {
+  const handleContentChange = async (content: EditorContent[]) => {
     if (!contentPage) return;
     
-    setIsSaving(true);
     try {
       // TODO: Replace with actual API call
       await new Promise(resolve => setTimeout(resolve, 500));
       
       setContentPage(prev => prev ? { ...prev, content, updatedAt: new Date() } : null);
-      setLastSaved(new Date());
     } catch (error) {
       console.error('Failed to save content:', error);
-    } finally {
-      setIsSaving(false);
     }
   };
 
@@ -142,17 +136,13 @@ export default function ContentPageView() {
   const handleMetadataUpdate = async (metadata: Partial<ContentPageMetadata>) => {
     if (!contentPage) return;
     
-    setIsSaving(true);
     try {
       // TODO: Replace with actual API call
       await new Promise(resolve => setTimeout(resolve, 300));
       
       setContentPage(prev => prev ? { ...prev, ...metadata, updatedAt: new Date() } : null);
-      setLastSaved(new Date());
     } catch (error) {
       console.error('Failed to update metadata:', error);
-    } finally {
-      setIsSaving(false);
     }
   };
 
@@ -188,7 +178,7 @@ export default function ContentPageView() {
       <div className="flex flex-1 flex-col items-center justify-center">
         <div className="text-center">
           <h1 className="text-2xl font-semibold mb-2">Content not found</h1>
-          <p className="text-muted-foreground mb-4">The content page you're looking for doesn't exist.</p>
+          <p className="text-muted-foreground mb-4">The content page you&apos;re looking for doesn&apos;t exist.</p>
           <Button onClick={() => router.push('/dashboard')}>
             <ArrowLeft className="w-4 h-4 mr-2" />
             Back to Dashboard

@@ -5,7 +5,7 @@ import * as React from 'react';
 import { useEditorRef, useEditorSelector } from '@udecode/plate/react';
 import { Redo2Icon, Undo2Icon } from 'lucide-react';
 
-import { ToolbarButton } from '@/components/ui/toolbar';
+import { ToolbarButton } from '@/components/editor/ui/core/toolbar';
 
 export function RedoToolbarButton(
   props: React.ComponentProps<typeof ToolbarButton>

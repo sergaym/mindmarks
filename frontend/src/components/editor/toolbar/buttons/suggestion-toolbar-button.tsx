@@ -8,7 +8,7 @@ import { PencilLineIcon } from 'lucide-react';
 
 import { cn } from '@/lib/utils';
 
-import { ToolbarButton } from '@/components/ui/toolbar';
+import { ToolbarButton } from '@/components/editor/ui/core/toolbar';
 
 export function SuggestionToolbarButton() {
   const { setOption } = useEditorPlugin(SuggestionPlugin);

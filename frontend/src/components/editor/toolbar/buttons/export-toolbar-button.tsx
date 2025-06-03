@@ -79,16 +79,16 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { BlockquoteElementStatic } from '@/components/ui/blockquote-element-static';
-import { CodeBlockElementStatic } from '@/components/ui/code-block-element-static';
+import { BlockquoteElementStatic } from '@/components/editor/ui/elements/blockquote-element-static';
+import { CodeBlockElementStatic } from '@/components/editor/ui/elements/code-block-element-static';
 import { CodeLeafStatic } from '@/components/editor/elements/leaves/code-leaf-static';
-import { CodeLineElementStatic } from '@/components/ui/code-line-element-static';
+import { CodeLineElementStatic } from '@/components/editor/ui/elements/code-line-element-static';
 import { CodeSyntaxLeafStatic } from '@/components/editor/elements/leaves/code-syntax-leaf-static';
-import { ColumnElementStatic } from '@/components/ui/column-element-static';
-import { ColumnGroupElementStatic } from '@/components/ui/column-group-element-static';
+import { ColumnElementStatic } from '@/components/editor/ui/elements/column-element-static';
+import { ColumnGroupElementStatic } from '@/components/editor/ui/elements/column-group-element-static';
 import { CommentLeafStatic } from '@/components/editor/elements/leaves/comment-leaf-static';
-import { DateElementStatic } from '@/components/ui/date-element-static';
-import { HeadingElementStatic } from '@/components/ui/heading-element-static';
+import { DateElementStatic } from '@/components/editor/ui/elements/date-element-static';
+import { HeadingElementStatic } from '@/components/editor/ui/elements/heading-element-static';
 import { HighlightLeafStatic } from '@/components/editor/elements/leaves/highlight-leaf-static';
 import { HrElementStatic } from '@/components/editor/elements/content/hr-element-static';
 import { ImageElementStatic } from '@/components/editor/elements/media/image-element-static';
@@ -104,19 +104,16 @@ import { MediaFileElementStatic } from '@/components/editor/elements/media/media
 import { MediaVideoElementStatic } from '@/components/editor/elements/media/media-video-element-static';
 import { MentionElementStatic } from '@/components/editor/elements/interactive/mention-element-static';
 import { ParagraphElementStatic } from '@/components/editor/elements/content/paragraph-element-static';
-import {
-  TableCellElementStatic,
-  TableCellHeaderStaticElement,
-} from '@/components/editor/elements/table/table-cell-element-static';
+import { TableCellElementStatic, TableCellHeaderStaticElement } from '@/components/editor/elements/table/table-cell-element-static';
 import { TableElementStatic } from '@/components/editor/elements/table/table-element-static';
 import { TableRowElementStatic } from '@/components/editor/elements/table/table-row-element-static';
 import { TocElementStatic } from '@/components/editor/elements/content/toc-element-static';
 import { ToggleElementStatic } from '@/components/editor/elements/interactive/toggle-element-static';
 
-import { EditorStatic } from '@/components/ui/editor-static';
-import { EquationElementStatic } from '@/components/ui/equation-element-static';
-import { InlineEquationElementStatic } from '@/components/ui/inline-equation-element-static';
-import { ToolbarButton } from '@/components/ui/toolbar';
+import { EditorStatic } from '@/components/editor/ui/core/editor-static';
+import { EquationElementStatic } from '@/components/editor/ui/elements/equation-element-static';
+import { InlineEquationElementStatic } from '@/components/editor/ui/elements/inline-equation-element-static';
+import { ToolbarButton } from '@/components/editor/ui/core/toolbar';
 
 const siteUrl = 'https://platejs.org';
 const lowlight = createLowlight(all);

@@ -7,7 +7,7 @@ import {
   useMarkToolbarButtonState,
 } from '@udecode/plate/react';
 
-import { ToolbarButton } from '@/components/ui/toolbar';
+import { ToolbarButton } from '@/components/editor/ui/core/toolbar';
 
 export function MarkToolbarButton({
   clear,

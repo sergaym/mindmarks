@@ -8,7 +8,7 @@ import { MessageSquareTextIcon } from 'lucide-react';
 
 import { commentsPlugin } from '@/components/editor/plugins/comments-plugin';
 
-import { ToolbarButton } from '@/components/ui/toolbar';
+import { ToolbarButton } from '@/components/editor/ui/core/toolbar';
 
 export function CommentToolbarButton() {
   const { editor, setOption, tf } = useEditorPlugin(commentsPlugin);

@@ -22,7 +22,7 @@ import {
   ToolbarSplitButton,
   ToolbarSplitButtonPrimary,
   ToolbarSplitButtonSecondary,
-} from '@/components/ui/toolbar';
+} from '@/components/editor/ui/core/toolbar';
 
 export function NumberedIndentListToolbarButton() {
   const editor = useEditorRef();

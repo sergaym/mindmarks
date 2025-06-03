@@ -31,7 +31,7 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { cn } from '@/lib/utils';
 
-import { ToolbarButton } from '@/components/ui/toolbar';
+import { ToolbarButton } from '@/components/editor/ui/core/toolbar';
 
 export function TableDropdownMenu(props: DropdownMenuProps) {
   const tableSelected = useEditorSelector(

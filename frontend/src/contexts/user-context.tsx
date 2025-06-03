@@ -1,6 +1,6 @@
 'use client';
 
-import React, { createContext, useState, useEffect, ReactNode } from 'react';
+import React, { createContext, useState, useEffect, ReactNode, useCallback } from 'react';
 import { User } from '@/types/content';
 import { apiClient, AuthenticationError, ApiError } from '@/lib/api/client';
 import { isTokenExpiringSoon, refreshAccessToken } from '@/lib/api/auth';
@@ -56,7 +56,7 @@ export function UserProvider({ children }: UserProviderProps) {
     }
   };
 
-  const fetchUserData = async () => {
+  const fetchUserData = useCallback(async () => {
     // Prevent multiple simultaneous calls
     if (hasFetched && !error) {
       return;
@@ -140,7 +140,7 @@ export function UserProvider({ children }: UserProviderProps) {
       setIsLoading(false);
       setHasFetched(true);
     }
-  };
+  }, [hasFetched, error]);
 
   // Development mode fallback user
   useEffect(() => {
@@ -156,7 +156,7 @@ export function UserProvider({ children }: UserProviderProps) {
   // Fetch user data on mount
   useEffect(() => {
     fetchUserData();
-  }, []);
+  }, [fetchUserData]);
 
   const contextValue: UserContextType = {
     user,

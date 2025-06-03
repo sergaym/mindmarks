@@ -38,7 +38,7 @@ import { cn } from '@/lib/utils';
 import { discussionPlugin } from '@/components/editor/plugins/discussion-plugin';
 
 import { useCommentEditor } from './comment-create-form';
-import { Editor, EditorContainer } from '@/components/ui/editor';
+import { Editor, EditorContainer } from '@/components/editor/ui/core';
 
 export const formatCommentDate = (date: Date) => {
   const now = new Date();

@@ -38,10 +38,10 @@ import { useCreateEditor } from '@/components/editor/use-create-editor';
 import type { TComment } from './comment';
 
 import { AILeaf } from '../elements/leaves/ai-leaf';
-import { DateElement } from '@/components/ui/date-element';
-import { Editor, EditorContainer } from '@/components/ui/editor';
+import { DateElement } from '@/components/editor/ui/elements/date-element';
+import { Editor, EditorContainer } from '@/components/editor/ui/core';
 import { EmojiInputElement } from '@/components/editor/elements/interactive/emoji-input-element';
-import { InlineEquationElement } from '@/components/ui/inline-equation-element';
+import { InlineEquationElement } from '@/components/editor/ui/elements/inline-equation-element';
 import { LinkElement } from '@/components/editor/elements/content/link-element';
 import { MentionElement } from '@/components/editor/elements/interactive/mention-element';
 import { MentionInputElement } from '@/components/editor/elements/interactive/mention-input-element';

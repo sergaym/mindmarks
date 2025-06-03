@@ -8,20 +8,10 @@ import {
   BreadcrumbPage,
   BreadcrumbSeparator,
 } from "@/components/ui/breadcrumb"
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import {
-  KanbanBoard,
-  KanbanCard,
-  KanbanCards,
-  KanbanHeader,
-  KanbanProvider,
-} from '@/components/ui/kibo-ui/kanban';
 import { useState, useEffect, useCallback } from 'react';
 import { useContent } from '@/hooks/use-content';
-import { useKanban, contentTypeIcons, dateFormatter, shortDateFormatter } from '@/hooks/use-kanban';
+import { useKanban } from '@/hooks/use-kanban';
 import { ContentItem, ContentType, User } from '@/types/content';
-import { AddContentButton } from '@/components/content/add-content-button';
-import { DeleteButton } from '@/components/content/delete-button';
 import { DeleteConfirmationDialog } from '@/components/content/delete-confirmation-dialog';
 import { DashboardHeader } from '@/components/dashboard/dashboard-header';
 import { DashboardContent } from '@/components/dashboard/dashboard-content';
@@ -44,9 +34,8 @@ export default function DashboardPage() {
     getCurrentUser
   } = useContent();
   
-  const { 
-    columns,
-  } = useKanban();
+  // Note: useKanban hook is available for future kanban functionality
+  useKanban();
 
   // Set breadcrumb for this page
   useEffect(() => {

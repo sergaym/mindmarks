@@ -6,13 +6,13 @@ import { EraserIcon } from 'lucide-react';
 
 import { DropdownMenuItem } from '@/components/ui/dropdown-menu';
 import { cn } from '@/lib/utils';
-import { ToolbarMenuGroup } from '@/components/ui/toolbar';
+import { ToolbarMenuGroup } from '@/components/editor/ui/core/toolbar';
 
 import {
   type TColor,
   ColorDropdownMenuItems,
 } from '../menus/dropdown-menus/color-dropdown-menu-items';
-import { ColorCustom } from '@/components/ui/colors-custom';
+import { ColorCustom } from '@/components/editor/ui/utils/colors-custom';
 
 type ColorPickerContentProps = React.ComponentProps<'div'> & {
   colors: TColor[];

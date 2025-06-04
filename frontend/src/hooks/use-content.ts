@@ -272,6 +272,44 @@ export function useContent() {
       return false;
     }
   }, [content, getCurrentUser]);
+
+  // Update content items (for kanban operations)
+  const updateContent = useCallback(async (updatedContent: ContentItem[]): Promise<{ status: Status }> => {
+    setStatus('loading');
+    
+    try {
+      const user = await getCurrentUser();
+      if (!user) {
+        return { status: 'error' };
+      }
+
+      // Find what changed and update on backend
+      const updatePromises = updatedContent.map(async (item) => {
+        const originalItem = content.find(c => c.id === item.id);
+        if (!originalItem) return;
+
+        // Check if status changed
+        if (originalItem.column !== item.column) {
+          const newStatus = item.column === 'planned' ? 'planned' : 
+                           item.column === 'done' ? 'completed' : 'in-progress';
+          
+          await updateContentApi(item.id, { status: newStatus }, user);
+        }
+      });
+
+      await Promise.all(updatePromises);
+      
+      setContent(updatedContent);
+      setStatus('success');
+      
+      return { status: 'success' };
+    } catch (error) {
+      console.error('Error updating content:', error);
+      setError('Failed to update content');
+      setStatus('error');
+      return { status: 'error' };
+    }
+  }, [content, getCurrentUser]);
     setStatus('loading');
     try {
       // Simulate API call to delete content

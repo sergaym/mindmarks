@@ -1,79 +1,19 @@
 'use client';
 
-import { useState, useEffect } from 'react';
-import { ContentItem, ContentType, User, Status } from '@/types/content';
+import { useState, useEffect, useCallback } from 'react';
+import { ContentItem, ContentType, User, Status, ContentPage } from '@/types/content';
+import { 
+  fetchUserContent, 
+  createContent, 
+  fetchContentById, 
+  updateContent as updateContentApi, 
+  deleteContent, 
+  ContentApiError,
+  CreateContentRequest,
+  UpdateContentRequest 
+} from '@/lib/api/content';
+import { fetchUser } from '@/lib/api/auth';
 
-// Sample user data - will be replaced with API call
-const users: User[] = [
-  {
-    id: "user1",
-    name: "Sergio Ayala",
-    image: "/me.png",
-  },
-  {
-    id: "user2",
-    name: "Jane Doe",
-    image: "/default-avatar.png",
-  }
-];
-
-// Sample content items - will be replaced with API call
-const sampleContent: ContentItem[] = [
-  {
-    id: "content1",
-    name: "Atomic Habits by James Clear",
-    startAt: new Date(2023, 10, 1),
-    endAt: new Date(2023, 10, 30),
-    column: "planned",
-    owner: users[0],
-    type: "book"
-  },
-  {
-    id: "content2",
-    name: "The Psychology of Money",
-    startAt: new Date(2023, 9, 15),
-    endAt: new Date(2023, 11, 15),
-    column: "in-progress",
-    owner: users[0],
-    type: "book"
-  },
-  {
-    id: "content3",
-    name: "Deep Work by Cal Newport",
-    startAt: new Date(2023, 8, 1),
-    endAt: new Date(2023, 8, 30),
-    column: "done",
-    owner: users[0],
-    type: "book"
-  },
-  {
-    id: "content4",
-    name: "How AI Works - Article",
-    startAt: new Date(2023, 10, 5),
-    endAt: new Date(2023, 10, 6),
-    column: "planned",
-    owner: users[1],
-    type: "article"
-  },
-  {
-    id: "content5",
-    name: "The Future of Web Development",
-    startAt: new Date(2023, 10, 10),
-    endAt: new Date(2023, 10, 11),
-    column: "in-progress",
-    owner: users[1],
-    type: "article"
-  },
-  {
-    id: "content6",
-    name: "Learn Next.js in 1 Hour",
-    startAt: new Date(2023, 9, 20),
-    endAt: new Date(2023, 9, 21),
-    column: "done",
-    owner: users[0],
-    type: "video"
-  }
-];
 
 /**
  * Custom hook for managing content items

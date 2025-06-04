@@ -208,6 +208,70 @@ export function useContent() {
       throw error;
     }
   }, [getCurrentUser]);
+
+  // Update content page
+  const updateContentPage = useCallback(async (
+    id: string, 
+    updates: Partial<ContentPage>
+  ): Promise<boolean> => {
+    try {
+      const user = await getCurrentUser();
+      if (!user) {
+        throw new Error('Authentication required');
+      }
+
+      // Transform frontend updates to API format
+      const updateRequest: UpdateContentRequest = {
+        title: updates.title,
+        type: updates.type,
+        url: updates.url,
+        description: updates.summary,
+        tags: updates.tags,
+        status: updates.status,
+        priority: updates.priority,
+        progress: updates.progress,
+        content: updates.content,
+        summary: updates.summary,
+        keyTakeaways: updates.keyTakeaways,
+      };
+
+      // Remove undefined values
+      Object.keys(updateRequest).forEach(key => {
+        if (updateRequest[key as keyof UpdateContentRequest] === undefined) {
+          delete updateRequest[key as keyof UpdateContentRequest];
+        }
+      });
+
+      const updatedPage = await updateContentApi(id, updateRequest, user);
+      
+      // Update cache
+      contentPageCache.set(id, updatedPage);
+      cacheTimestamps.set(id, Date.now());
+      
+      // Update content list if the item exists there
+      const contentIndex = content.findIndex(item => item.id === id);
+      if (contentIndex >= 0) {
+        const updatedContent = [...content];
+        updatedContent[contentIndex] = {
+          ...updatedContent[contentIndex],
+          name: updatedPage.title,
+          type: updatedPage.type,
+          url: updatedPage.url,
+          tags: updatedPage.tags,
+          column: updatedPage.status === 'planned' ? 'planned' : 
+                  updatedPage.status === 'completed' ? 'done' : 'in-progress',
+          priority: updatedPage.priority,
+          progress: updatedPage.progress,
+        };
+        setContent(updatedContent);
+      }
+      
+      return true;
+    } catch (error) {
+      console.error('Error updating content page:', error);
+      return false;
+    }
+  }, [content, getCurrentUser]);
     setStatus('loading');
     try {
       // Simulate API call to delete content

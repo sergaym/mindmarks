@@ -22,32 +22,47 @@ const CACHE_TIMEOUT = 5 * 60 * 1000;
 const cacheTimestamps = new Map<string, number>();
 
 /**
- * Custom hook for managing content items
- * In the future, this will connect to a real API instead of using mock data
+ * Integrates with backend API and handles authentication
  */
 export function useContent() {
   const [content, setContent] = useState<ContentItem[]>([]);
+  const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [status, setStatus] = useState<Status>('idle');
   const [error, setError] = useState<string | null>(null);
 
-  // Simulate API call to fetch content
-  useEffect(() => {
-    async function fetchContent() {
-      setStatus('loading');
-      try {
-        // Simulate API latency
-        await new Promise(resolve => setTimeout(resolve, 500));
-        setContent(sampleContent);
-        setStatus('success');
-      } catch (error) {
-        console.error('Error fetching content:', error);
-        setError('Failed to fetch content');
-        setStatus('error');
-      }
-    }
+  // Get current user from session/auth
+  const getCurrentUser = useCallback(async (): Promise<User | null> => {
+    if (currentUser) return currentUser;
 
-    fetchContent();
-  }, []);
+    try {
+      // Get access token from session storage
+      const accessToken = typeof window !== 'undefined' 
+        ? sessionStorage.getItem('access_token') 
+        : null;
+
+      if (!accessToken) {
+        throw new Error('No access token found');
+      }
+
+      const result = await fetchUser(accessToken);
+      if (result.success) {
+        // Transform auth User to content User format
+        const contentUser: User = {
+          id: result.data.id,
+          name: result.data.name || result.data.email.split('@')[0],
+          image: '/default-avatar.png', // Default image, can be enhanced later
+        };
+        setCurrentUser(contentUser);
+        return contentUser;
+      } else {
+        throw new Error(result.error.message);
+      }
+    } catch (error) {
+      console.error('Failed to fetch current user:', error);
+      setError('Authentication required. Please log in.');
+      return null;
+    }
+  }, [currentUser]);
 
   // Function to update content item
   const updateContent = async (updatedContent: ContentItem[]) => {

@@ -55,10 +55,8 @@ export default function ContentPageView() {
       }
     }
 
-    if (contentId) {
-      loadContentPage();
-    }
-  }, [contentId, user]);
+    loadContentPage();
+  }, [contentId, getContentPage]);
 
   // Set breadcrumb when content is loaded
   useEffect(() => {
@@ -100,10 +98,10 @@ export default function ContentPageView() {
     if (!contentPage) return;
     
     try {
-      // TODO: Replace with actual API call
-      await new Promise(resolve => setTimeout(resolve, 500));
-      
-      setContentPage(prev => prev ? { ...prev, content, updatedAt: new Date() } : null);
+      const success = await updateContentPage(contentPage.id, { content });
+      if (success) {
+        setContentPage(prev => prev ? { ...prev, content, updatedAt: new Date() } : null);
+      }
     } catch (error) {
       console.error('Failed to save content:', error);
     }
@@ -114,10 +112,10 @@ export default function ContentPageView() {
     if (!contentPage) return;
     
     try {
-      // TODO: Replace with actual API call
-      await new Promise(resolve => setTimeout(resolve, 300));
-      
-      setContentPage(prev => prev ? { ...prev, ...metadata, updatedAt: new Date() } : null);
+      const success = await updateContentPage(contentPage.id, metadata);
+      if (success) {
+        setContentPage(prev => prev ? { ...prev, ...metadata, updatedAt: new Date() } : null);
+      }
     } catch (error) {
       console.error('Failed to update metadata:', error);
     }
@@ -150,12 +148,19 @@ export default function ContentPageView() {
     );
   }
 
-  if (!contentPage) {
+  // Error state
+  if (error || !contentPage) {
     return (
       <div className="flex flex-1 flex-col items-center justify-center">
         <div className="text-center">
-          <h1 className="text-2xl font-semibold mb-2">Content not found</h1>
-          <p className="text-muted-foreground mb-4">The content page you&apos;re looking for doesn&apos;t exist.</p>
+          <h1 className="text-2xl font-semibold mb-2">
+            {error === 'Content not found' ? 'Content not found' : 'Error loading content'}
+          </h1>
+          <p className="text-muted-foreground mb-4">
+            {error === 'Content not found' 
+              ? "The content page you're looking for doesn't exist." 
+              : 'There was an error loading this content page.'}
+          </p>
           <Button onClick={() => router.push('/dashboard')}>
             <ArrowLeft className="w-4 h-4 mr-2" />
             Back to Dashboard

@@ -14,6 +14,12 @@ import {
 } from '@/lib/api/content';
 import { fetchUser } from '@/lib/api/auth';
 
+// Cache for content pages to avoid repeated API calls
+const contentPageCache = new Map<string, ContentPage>();
+
+// Cache timeout (5 minutes)
+const CACHE_TIMEOUT = 5 * 60 * 1000;
+const cacheTimestamps = new Map<string, number>();
 
 /**
  * Custom hook for managing content items

@@ -2,7 +2,7 @@
 
 import { useState, useMemo, useRef, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { ContentType, User } from '@/types/content';
+import { ContentType, User, ContentItem } from '@/types/content';
 import { contentTemplates, getTemplateByType } from '@/lib/content-templates';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -25,7 +25,7 @@ interface CreateContentDialogProps {
     description?: string;
     tags?: string[];
     url?: string;
-  }) => Promise<void>;
+  }) => Promise<{ status: 'success' | 'error'; data?: ContentItem[]; id?: string; error?: string }>;
   currentUser: User;
 }
 
@@ -192,7 +192,7 @@ export function CreateContentDialog({
     setError('');
     
     try {
-      await onAddContent({
+      const result = await onAddContent({
         name: title.trim(),
         type: selectedType,
         startAt: new Date(),
@@ -202,11 +202,14 @@ export function CreateContentDialog({
         tags: getTemplateByType(selectedType)?.suggestedTags || [],
       });
 
-      // Then navigate to the editor
-      const contentId = Math.random().toString(36).substr(2, 9);
-      router.push(`/dashboard/content/${contentId}`);
-      
-      handleClose();
+      // Use the actual ID returned from content creation
+      if (result?.status === 'success' && result.id) {
+        // Navigate to the actual content page
+        router.push(`/dashboard/content/${result.id}`);
+        handleClose();
+      } else {
+        throw new Error('Failed to create content - no ID returned');
+      }
     } catch (error) {
       console.error('Failed to create content:', error);
       setError('Failed to create content. Please try again.');

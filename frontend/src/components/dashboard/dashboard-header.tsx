@@ -1,7 +1,7 @@
 'use client';
 
 import { AddContentButton } from '@/components/content/add-content-button';
-import { ContentType, User } from '@/types/content';
+import { ContentType, User, ContentItem } from '@/types/content';
 
 interface DashboardHeaderProps {
   onAddContent: (newItem: {
@@ -14,7 +14,7 @@ interface DashboardHeaderProps {
     description?: string;
     tags?: string[];
     url?: string;
-  }) => Promise<void>;
+  }) => Promise<{ status: 'success' | 'error'; data?: ContentItem[]; id?: string; error?: string }>;
   currentUser: User;
 }
 

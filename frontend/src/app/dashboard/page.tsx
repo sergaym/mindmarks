@@ -71,7 +71,7 @@ export default function DashboardPage() {
     tags?: string[];
     url?: string;
   }) => {
-    await addContent(newItem);
+    return await addContent(newItem);
   }, [addContent]);
 
   // Handler for removing content

@@ -310,36 +310,66 @@ export function useContent() {
       return { status: 'error' };
     }
   }, [content, getCurrentUser]);
+
+  // Remove content item
+  const removeContent = useCallback(async (id: string) => {
     setStatus('loading');
+    
     try {
-      // Simulate API call to delete content
-      await new Promise(resolve => setTimeout(resolve, 300));
+      await deleteContent(id);
       
+      // Update local state
       const newContent = content.filter(item => item.id !== id);
       setContent(newContent);
+      
+      // Clear cache
+      contentPageCache.delete(id);
+      cacheTimestamps.delete(id);
+      
       setStatus('success');
       return { status: 'success' as Status, data: newContent };
     } catch (error) {
       console.error('Error removing content:', error);
-      setError('Failed to remove content');
+      
+      let errorMessage = 'Failed to delete content';
+      if (error instanceof ContentApiError) {
+        errorMessage = error.message;
+      }
+      
+      setError(errorMessage);
       setStatus('error');
-      return { status: 'error' as Status, error: 'Failed to remove content' };
+      return { status: 'error' as Status, error: errorMessage };
     }
-  };
+  }, [content]);
 
-  // Get current user (for now, just return the first user)
-  const getCurrentUser = () => {
-    return users[0];
-  };
+  // Get current user synchronously (for components that need immediate access)
+  const getCurrentUserSync = useCallback(() => {
+    return currentUser;
+  }, [currentUser]);
+
+  // Refresh content from server
+  const refreshContent = useCallback(() => {
+    // Clear cache
+    contentPageCache.clear();
+    cacheTimestamps.clear();
+    
+    // Fetch fresh data
+    return fetchContent();
+  }, [fetchContent]);
 
   return {
     content,
     status,
     error,
+    currentUser,
     updateContent,
     addContent,
     removeContent,
+    getContentPage,
+    updateContentPage,
+    getCurrentUser: getCurrentUserSync,
+    refreshContent,
+    // Legacy compatibility
     setContent,
-    getCurrentUser
   };
 } 

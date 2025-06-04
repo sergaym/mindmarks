@@ -3,8 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { ContentPage, ContentPageMetadata, EditorContent } from '@/types/content';
-import { getTemplateByType } from '@/lib/content-templates';
-import { useUser } from '@/hooks/use-user';
+import { useContent } from '@/hooks/use-content';
 import { ContentMetadataPanel } from '@/components/content/content-metadata-panel';
 import { ContentEditor } from '@/components/content/content-editor';
 import { ContentHeader } from '@/components/content/content-header';
@@ -24,55 +23,33 @@ import { useBreadcrumb } from '../../layout';
 export default function ContentPageView() {
   const params = useParams();
   const router = useRouter();
-  const { user } = useUser();
   const { setBreadcrumb } = useBreadcrumb();
+  const { getContentPage, updateContentPage } = useContent();
   const contentId = params.id as string;
   
   const [contentPage, setContentPage] = useState<ContentPage | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [showMetadataPanel, setShowMetadataPanel] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-  // Load content page data
+  // Load content page data from unified store
   useEffect(() => {
     async function loadContentPage() {
+      if (!contentId) return;
+      
       setIsLoading(true);
+      setError(null);
+      
       try {
-        // TODO: Replace with actual API call
-        await new Promise(resolve => setTimeout(resolve, 1000)); // Simulate loading
-        
-        // Mock data for development
-        const template = getTemplateByType('book');
-        const mockContentPage: ContentPage = {
-          id: contentId,
-          title: 'Atomic Habits by James Clear',
-          type: 'book',
-          url: 'https://amazon.com/atomic-habits',
-          tags: ['books', 'habits', 'productivity', 'self-improvement'],
-          status: 'in-progress',
-          priority: 'high',
-          author: 'James Clear',
-          publishedDate: new Date('2018-10-16'),
-          estimatedReadTime: 288,
-          rating: 5,
-          progress: 65,
-          content: template?.defaultContent || [],
-          summary: 'A comprehensive guide to building good habits and breaking bad ones.',
-          keyTakeaways: [
-            'Small changes compound over time',
-            'Focus on systems, not goals',
-            'Make good habits obvious, attractive, easy, and satisfying'
-          ],
-          createdAt: new Date('2024-01-15'),
-          updatedAt: new Date(),
-          createdBy: user || { id: '1', name: 'You', image: '' },
-          lastEditedBy: user || { id: '1', name: 'You', image: '' },
-          isPublic: false,
-          collaborators: [],
-        };
-        
-        setContentPage(mockContentPage);
+        const page = await getContentPage(contentId);
+        if (page) {
+          setContentPage(page);
+        } else {
+          setError('Content not found');
+        }
       } catch (error) {
         console.error('Failed to load content page:', error);
+        setError('Failed to load content page');
       } finally {
         setIsLoading(false);
       }

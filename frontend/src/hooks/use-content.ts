@@ -64,25 +64,47 @@ export function useContent() {
     }
   }, [currentUser]);
 
-  // Function to update content item
-  const updateContent = async (updatedContent: ContentItem[]) => {
+  // Fetch content from backend
+  const fetchContent = useCallback(async () => {
     setStatus('loading');
-    try {
-      // Simulate API call to update content
-      await new Promise(resolve => setTimeout(resolve, 300));
-      setContent(updatedContent);
-      setStatus('success');
-      return { status: 'success' as Status };
-    } catch (error) {
-      console.error('Error updating content:', error);
-      setError('Failed to update content');
-      setStatus('error');
-      return { status: 'error' as Status, error: 'Failed to update content' };
-    }
-  };
+    setError(null);
 
-  // Function to add new content item
-  const addContent = async (newItem: {
+    try {
+      const user = await getCurrentUser();
+      if (!user) {
+        setStatus('error');
+        setError('Authentication required');
+        return;
+      }
+
+      const contentItems = await fetchUserContent(user);
+      setContent(contentItems);
+      setStatus('success');
+    } catch (error) {
+      console.error('Error fetching content:', error);
+      
+      if (error instanceof ContentApiError) {
+        if (error.status === 401) {
+          setError('Authentication expired. Please log in again.');
+        } else if (error.status === 403) {
+          setError('Access denied. You do not have permission to view this content.');
+        } else {
+          setError(`Failed to load content: ${error.message}`);
+        }
+      } else {
+        setError('Failed to load content. Please check your connection and try again.');
+      }
+      setStatus('error');
+    }
+  }, [getCurrentUser]);
+
+  // Load content on mount and when user changes
+  useEffect(() => {
+    fetchContent();
+  }, [fetchContent]);
+
+  // Add new content item
+  const addContent = useCallback(async (newItem: {
     name: string;
     type: ContentType;
     startAt: Date;
@@ -92,43 +114,64 @@ export function useContent() {
     description?: string;
     tags?: string[];
     url?: string;
-  }) => {
+  }): Promise<{ status: 'success' | 'error'; data?: ContentItem[]; id?: string; error?: string }> => {
     setStatus('loading');
+    
     try {
-      // Simulate API call to create content
-      await new Promise(resolve => setTimeout(resolve, 300));
-      
-      // Generate a simple ID - in a real app, this would come from the API
-      const id = `content${content.length + 1}`;
-      
-      // Create a complete content item with proper types
-      const completeItem: ContentItem = {
-        id,
-        name: newItem.name,
+      const user = await getCurrentUser();
+      if (!user) {
+        return { 
+          status: 'error', 
+          error: 'Authentication required' 
+        };
+      }
+
+      // For now, create with predefined template content
+      const createRequest: CreateContentRequest = {
+        title: newItem.name,
         type: newItem.type,
-        startAt: newItem.startAt,
-        column: newItem.column,
-        owner: newItem.owner,
-        endAt: newItem.endAt,
+        url: newItem.url,
         description: newItem.description,
         tags: newItem.tags,
-        url: newItem.url,
+        status: newItem.column === 'planned' ? 'planned' : 
+                newItem.column === 'done' ? 'completed' : 'in-progress',
+        priority: 'medium'
       };
+
+      const result = await createContent(createRequest, user);
       
-      const newContent = [...content, completeItem];
-      setContent(newContent);
+      // Update local state
+      const updatedContent = [...content, result.content];
+      setContent(updatedContent);
+      
+      // Cache the content page
+      contentPageCache.set(result.id, result.contentPage);
+      cacheTimestamps.set(result.id, Date.now());
+      
       setStatus('success');
-      return { status: 'success' as Status, data: newContent };
+      
+      return { 
+        status: 'success', 
+        data: updatedContent, 
+        id: result.id 
+      };
     } catch (error) {
       console.error('Error adding content:', error);
-      setError('Failed to add content');
+      
+      let errorMessage = 'Failed to create content';
+      if (error instanceof ContentApiError) {
+        errorMessage = error.message;
+      }
+      
+      setError(errorMessage);
       setStatus('error');
-      return { status: 'error' as Status, error: 'Failed to add content' };
+      
+      return { 
+        status: 'error', 
+        error: errorMessage 
+      };
     }
-  };
-
-  // Function to remove content item
-  const removeContent = async (id: string) => {
+  }, [content, getCurrentUser]);
     setStatus('loading');
     try {
       // Simulate API call to delete content

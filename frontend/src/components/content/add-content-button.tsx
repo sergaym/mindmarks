@@ -2,8 +2,9 @@
 
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
-import { AddContentModal } from './add-content-modal';
 import { ContentType, User } from '@/types/content';
+import { Plus } from 'lucide-react';
+import { CreateContentDialog } from './create-content-dialog';
 
 interface AddContentButtonProps {
   onAdd: (content: {
@@ -16,25 +17,27 @@ interface AddContentButtonProps {
     description?: string;
     tags?: string[];
     url?: string;
-  }) => void;
+  }) => Promise<void>;
   currentUser: User;
 }
 
 export function AddContentButton({ onAdd, currentUser }: AddContentButtonProps) {
-  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isDialogOpen, setIsDialogOpen] = useState(false);
 
   return (
     <>
       <Button 
-        onClick={() => setIsModalOpen(true)}
+        onClick={() => setIsDialogOpen(true)} 
+        className="flex items-center gap-2"
       >
-        Add New
+        <Plus className="w-4 h-4" />
+        Create Content
       </Button>
-      
-      <AddContentModal
-        isOpen={isModalOpen}
-        onClose={() => setIsModalOpen(false)}
-        onAdd={onAdd}
+
+      <CreateContentDialog
+        isOpen={isDialogOpen}
+        onClose={() => setIsDialogOpen(false)}
+        onAddContent={onAdd}
         currentUser={currentUser}
       />
     </>

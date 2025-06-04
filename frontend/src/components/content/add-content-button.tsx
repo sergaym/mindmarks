@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
-import { ContentType, User } from '@/types/content';
+import { ContentType, User, ContentItem } from '@/types/content';
 import { Plus } from 'lucide-react';
 import { CreateContentDialog } from './create-content-dialog';
 
@@ -17,7 +17,7 @@ interface AddContentButtonProps {
     description?: string;
     tags?: string[];
     url?: string;
-  }) => Promise<void>;
+  }) => Promise<{ status: 'success' | 'error'; data?: ContentItem[]; id?: string; error?: string }>;
   currentUser: User;
 }
 

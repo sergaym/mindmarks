@@ -172,6 +172,42 @@ export function useContent() {
       };
     }
   }, [content, getCurrentUser]);
+
+  // Get content page by ID with caching
+  const getContentPage = useCallback(async (id: string): Promise<ContentPage | null> => {
+    try {
+      // Check cache first
+      const cached = contentPageCache.get(id);
+      const cacheTime = cacheTimestamps.get(id);
+      
+      if (cached && cacheTime && (Date.now() - cacheTime) < CACHE_TIMEOUT) {
+        return cached;
+      }
+
+      const user = await getCurrentUser();
+      if (!user) {
+        throw new Error('Authentication required');
+      }
+
+      const contentPage = await fetchContentById(id, user);
+      
+      if (contentPage) {
+        // Update cache
+        contentPageCache.set(id, contentPage);
+        cacheTimestamps.set(id, Date.now());
+      }
+      
+      return contentPage;
+    } catch (error) {
+      console.error('Error fetching content page:', error);
+      
+      if (error instanceof ContentApiError && error.status === 404) {
+        return null;
+      }
+      
+      throw error;
+    }
+  }, [getCurrentUser]);
     setStatus('loading');
     try {
       // Simulate API call to delete content

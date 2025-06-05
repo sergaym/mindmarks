@@ -166,3 +166,16 @@ def delete_content(
         )
     
     return {"message": "Content deleted successfully"}
+
+
+@router.get("/stats/me", response_model=ContentStats)
+def get_my_content_stats(
+    db: DBSession,
+    current_user: User = Depends(get_current_user),
+):
+    """
+    Get content statistics for current user
+    """
+    content_svc = ContentService(db)
+    return content_svc.get_content_stats(UUID(current_user.id))
+

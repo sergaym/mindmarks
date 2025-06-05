@@ -15,7 +15,7 @@ import { ContentItem, ContentType, User } from '@/types/content';
 import { DeleteConfirmationDialog } from '@/components/content/delete-confirmation-dialog';
 import { DashboardHeader } from '@/components/dashboard/dashboard-header';
 import { DashboardContent } from '@/components/dashboard/dashboard-content';
-import { LoadingState } from '@/components/ui/loading-state';
+import { SkeletonDashboard } from '@/components/ui/skeleton-dashboard';
 import { ErrorState } from '@/components/ui/error-state';
 import { useBreadcrumb } from './layout';
 
@@ -26,8 +26,10 @@ export default function DashboardPage() {
   // Initialize hooks for content management
   const { 
     content, 
+    currentUser,
     status, 
     error, 
+    isRefreshing,
     updateContent,
     addContent,
     removeContent,

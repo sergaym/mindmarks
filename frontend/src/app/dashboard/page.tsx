@@ -32,8 +32,7 @@ export default function DashboardPage() {
     isRefreshing,
     updateContent,
     addContent,
-    removeContent,
-    getCurrentUser
+    removeContent
   } = useContent();
   
   // Note: useKanban hook is available for future kanban functionality

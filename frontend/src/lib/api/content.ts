@@ -16,3 +16,40 @@ export class ContentApiError extends Error {
 }
 
 // Request types
+export interface CreateContentRequest {
+  title: string;
+  type: ContentType;
+  url?: string;
+  description?: string;
+  tags?: string[];
+  status: 'planned' | 'in-progress' | 'completed' | 'archived';
+  priority: 'low' | 'medium' | 'high';
+}
+
+export interface UpdateContentRequest {
+  title?: string;
+  type?: ContentType;
+  url?: string;
+  description?: string;
+  tags?: string[];
+  status?: 'planned' | 'in-progress' | 'completed' | 'archived';
+  priority?: 'low' | 'medium' | 'high';
+  content?: EditorContent[];
+  summary?: string;
+  keyTakeaways?: string[];
+  author?: string;
+  publishedDate?: Date;
+  estimatedReadTime?: number;
+  rating?: number;
+  progress?: number;
+  isPublic?: boolean;
+}
+
+// Response types
+export interface CreateContentResponse {
+  id: string;
+  content: ContentItem;
+  contentPage: ContentPage;
+}
+
+/**

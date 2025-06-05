@@ -145,3 +145,24 @@ def update_content(
         )
     
     return ContentService.content_to_read_schema(content)
+
+
+@router.delete("/{content_id}")
+def delete_content(
+    content_id: UUID,
+    db: DBSession,
+    current_user: User = Depends(get_current_user),
+):
+    """
+    Delete content (owner only)
+    """
+    content_svc = ContentService(db)
+    success = content_svc.delete_content(content_id, UUID(current_user.id))
+    
+    if not success:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Content not found or no permission to delete"
+        )
+    
+    return {"message": "Content deleted successfully"}

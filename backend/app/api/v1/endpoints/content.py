@@ -124,3 +124,24 @@ def get_content_by_id(
     
     return ContentService.content_to_read_schema(content)
 
+
+@router.put("/{content_id}", response_model=ContentRead)
+def update_content(
+    content_id: UUID,
+    content_in: ContentUpdate,
+    db: DBSession,
+    current_user: User = Depends(get_current_user),
+):
+    """
+    Update content
+    """
+    content_svc = ContentService(db)
+    content = content_svc.update_content(content_id, content_in, UUID(current_user.id))
+    
+    if not content:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Content not found or no permission to edit"
+        )
+    
+    return ContentService.content_to_read_schema(content)

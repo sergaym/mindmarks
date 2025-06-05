@@ -380,3 +380,48 @@ export async function fetchContentById(id: string, user: User): Promise<ContentP
   }
 }
 
+/**
+ * Update content item
+ */
+export async function updateContent(
+  id: string,
+  request: UpdateContentRequest,
+  user: User
+): Promise<ContentPage> {
+  try {
+    // Mock implementation
+    const now = new Date();
+    const updatedPage: ContentPage = {
+      id,
+      title: request.title || 'Updated Content',
+      type: request.type || 'article',
+      url: request.url,
+      tags: request.tags || [],
+      status: request.status || 'planned',
+      priority: request.priority || 'medium',
+      content: request.content || getDefaultContent(request.type || 'article'),
+      summary: request.summary,
+      keyTakeaways: request.keyTakeaways,
+      author: request.author,
+      publishedDate: request.publishedDate,
+      estimatedReadTime: request.estimatedReadTime,
+      rating: request.rating,
+      progress: request.progress,
+      createdAt: new Date(Date.now() - 24 * 60 * 60 * 1000), // Yesterday
+      updatedAt: now,
+      createdBy: user,
+      lastEditedBy: user,
+      isPublic: request.isPublic || false,
+      collaborators: [],
+    };
+
+    return updatedPage;
+
+    // Real implementation would be:
+    // return await apiRequest<ContentPage>(`/api/v1/content/${id}`, 'PUT', request);
+  } catch (error) {
+    console.error('Error updating content:', error);
+    throw error;
+  }
+}
+

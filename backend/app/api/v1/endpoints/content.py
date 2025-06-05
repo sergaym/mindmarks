@@ -72,3 +72,34 @@ def get_user_content(
     content_list = content_svc.get_user_content(user_id, filters)
     return [ContentService.content_to_list_item(content) for content in content_list]
 
+
+
+
+@router.post("", response_model=ContentResponse)
+def create_content(
+    content_in: ContentCreate,
+    db: DBSession,
+    current_user: User = Depends(get_current_user),
+):
+    """
+    Create new content
+    """
+    content_svc = ContentService(db)
+    content = content_svc.create_content(content_in, UUID(current_user.id))
+    
+    if not content:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Failed to create content"
+        )
+    
+    # Convert to response format
+    content_item = ContentService.content_to_list_item(content)
+    content_page = ContentService.content_to_read_schema(content)
+    
+    return ContentResponse(
+        id=UUID(content.id),
+        content=content_item,
+        content_page=content_page
+    )
+

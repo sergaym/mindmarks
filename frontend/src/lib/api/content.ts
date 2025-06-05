@@ -297,3 +297,52 @@ export async function fetchUserContent(user: User): Promise<ContentItem[]> {
     throw error;
   }
 }
+
+/**
+ * Create new content item
+ */
+export async function createContent(
+  request: CreateContentRequest,
+  user: User
+): Promise<CreateContentResponse> {
+  try {
+    // Create a mock response for now
+    const id = Date.now().toString();
+    const now = new Date();
+    
+    const contentPage: ContentPage = {
+      id,
+      title: request.title,
+      type: request.type,
+      url: request.url,
+      tags: request.tags || [],
+      status: request.status,
+      priority: request.priority,
+      content: getDefaultContent(request.type),
+      summary: request.description,
+      createdAt: now,
+      updatedAt: now,
+      createdBy: user,
+      lastEditedBy: user,
+      isPublic: false,
+      collaborators: [],
+    };
+
+    const contentItem = contentPageToItem(contentPage);
+
+    // Real implementation would be:
+    // const response = await apiRequest<CreateContentResponse>('/api/v1/content', 'POST', request);
+    // return response;
+
+    return {
+      id,
+      content: contentItem,
+      contentPage,
+    };
+  } catch (error) {
+    console.error('Error creating content:', error);
+    throw error;
+  }
+}
+
+/**

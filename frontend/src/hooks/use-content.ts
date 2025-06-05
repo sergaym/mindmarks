@@ -171,8 +171,6 @@ export function useContent() {
     tags?: string[];
     url?: string;
   }): Promise<{ status: 'success' | 'error'; data?: ContentItem[]; id?: string; error?: string }> => {
-    setStatus('loading');
-    
     try {
       const user = await getCurrentUser();
       if (!user) {
@@ -181,6 +179,28 @@ export function useContent() {
           error: 'Authentication required' 
         };
       }
+
+      // Create optimistic item for instant UI feedback
+      const optimisticId = `temp-${Date.now()}`;
+      const optimisticItem: ContentItem = {
+        id: optimisticId,
+        name: newItem.name,
+        type: newItem.type,
+        startAt: newItem.startAt,
+        endAt: newItem.endAt,
+        column: newItem.column,
+        owner: newItem.owner,
+        description: newItem.description,
+        tags: newItem.tags,
+        url: newItem.url,
+        progress: 0,
+        priority: 'medium',
+      };
+
+      // Add optimistically to UI immediately
+      const optimisticContent = [...content, optimisticItem];
+      setContent(optimisticContent);
+      persistentCache.content = optimisticContent;
 
       // For now, create with predefined template content
       const createRequest: CreateContentRequest = {
@@ -196,23 +216,27 @@ export function useContent() {
 
       const result = await createContent(createRequest, user);
       
-      // Update local state
-      const updatedContent = [...content, result.content];
-      setContent(updatedContent);
+      // Replace optimistic item with real one
+      const finalContent = optimisticContent.map(item => 
+        item.id === optimisticId ? result.content : item
+      );
+      setContent(finalContent);
+      persistentCache.content = finalContent;
       
       // Cache the content page
-      contentPageCache.set(result.id, result.contentPage);
-      cacheTimestamps.set(result.id, Date.now());
-      
-      setStatus('success');
+      persistentCache.pages.set(result.id, result.contentPage);
       
       return { 
         status: 'success', 
-        data: updatedContent, 
+        data: finalContent, 
         id: result.id 
       };
     } catch (error) {
       console.error('Error adding content:', error);
+      
+      // Revert optimistic update on error
+      setContent(content);
+      persistentCache.content = content;
       
       let errorMessage = 'Failed to create content';
       if (error instanceof ContentApiError) {
@@ -220,7 +244,6 @@ export function useContent() {
       }
       
       setError(errorMessage);
-      setStatus('error');
       
       return { 
         status: 'error', 

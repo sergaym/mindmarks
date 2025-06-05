@@ -346,3 +346,37 @@ export async function createContent(
 }
 
 /**
+ * Fetch content page by ID
+ */
+export async function fetchContentById(id: string, user: User): Promise<ContentPage | null> {
+  try {
+    // Mock implementation
+    const mockPage: ContentPage = {
+      id,
+      title: 'Sample Content',
+      type: 'article',
+      tags: ['sample'],
+      status: 'planned',
+      priority: 'medium',
+      content: getDefaultContent('article'),
+      createdAt: new Date(),
+      updatedAt: new Date(),
+      createdBy: user,
+      lastEditedBy: user,
+      isPublic: false,
+      collaborators: [],
+    };
+
+    return mockPage;
+
+    // Real implementation would be:
+    // return await apiRequest<ContentPage>(`/api/v1/content/${id}`);
+  } catch (error) {
+    if (error instanceof ContentApiError && error.status === 404) {
+      return null;
+    }
+    console.error('Error fetching content by ID:', error);
+    throw error;
+  }
+}
+

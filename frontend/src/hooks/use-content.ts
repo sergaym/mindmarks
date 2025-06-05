@@ -14,25 +14,31 @@ import {
 } from '@/lib/api/content';
 import { fetchUser } from '@/lib/api/auth';
 
-// Cache for content pages to avoid repeated API calls
-const contentPageCache = new Map<string, ContentPage>();
+// Persistent cache across component mounts for instant UX
+const persistentCache = {
+  content: [] as ContentItem[],
+  user: null as User | null,
+  lastFetch: 0,
+  pages: new Map<string, ContentPage>(),
+};
 
 // Cache timeout (5 minutes)
 const CACHE_TIMEOUT = 5 * 60 * 1000;
-const cacheTimestamps = new Map<string, number>();
 
 /**
  * Integrates with backend API and handles authentication
  */
 export function useContent() {
-  const [content, setContent] = useState<ContentItem[]>([]);
-  const [currentUser, setCurrentUser] = useState<User | null>(null);
+  // Initialize with cached data for instant display
+  const [content, setContent] = useState<ContentItem[]>(persistentCache.content);
+  const [currentUser, setCurrentUser] = useState<User | null>(persistentCache.user);
   const [status, setStatus] = useState<Status>('idle');
   const [error, setError] = useState<string | null>(null);
+  const [isRefreshing, setIsRefreshing] = useState(false);
 
-  // Get current user from session/auth
+  // Get current user from session/auth with cache
   const getCurrentUser = useCallback(async (): Promise<User | null> => {
-    if (currentUser) return currentUser;
+    if (persistentCache.user) return persistentCache.user;
 
     try {
       // Get access token from session storage
@@ -52,6 +58,8 @@ export function useContent() {
           name: result.data.name || result.data.email.split('@')[0],
           image: '/default-avatar.png', // Default image, can be enhanced later
         };
+        // Cache user
+        persistentCache.user = contentUser;
         setCurrentUser(contentUser);
         return contentUser;
       } else {
@@ -62,7 +70,34 @@ export function useContent() {
       setError('Authentication required. Please log in.');
       return null;
     }
-  }, [currentUser]);
+  }, []);
+
+  // Check if cache is fresh
+  const isCacheFresh = useCallback(() => {
+    return Date.now() - persistentCache.lastFetch < CACHE_TIMEOUT;
+  }, []);
+
+  // Background refresh function
+  const refreshContentInBackground = useCallback(async () => {
+    try {
+      setIsRefreshing(true);
+      const user = await getCurrentUser();
+      if (!user) return;
+
+      const contentItems = await fetchUserContent(user);
+      
+      // Update cache and state
+      persistentCache.content = contentItems;
+      persistentCache.lastFetch = Date.now();
+      setContent(contentItems);
+      setStatus('success');
+    } catch (error) {
+      console.error('Background refresh failed:', error);
+      // Don't show error for background refresh
+    } finally {
+      setIsRefreshing(false);
+    }
+  }, [getCurrentUser]);
 
   // Fetch content from backend
   const fetchContent = useCallback(async () => {

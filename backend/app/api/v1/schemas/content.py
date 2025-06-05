@@ -28,3 +28,24 @@ class ContentPriority(str, Enum):
     medium = "medium"
     high = "high"
 
+
+class EditorContent(BaseModel):
+    """Editor content structure for rich text content"""
+    type: str
+    children: List[Dict[str, Any]]
+    attrs: Optional[Dict[str, Any]] = None
+
+
+class UserBase(BaseModel):
+    """Basic user info for content schemas"""
+    id: UUID4
+    name: str
+    image: Optional[str] = None
+
+
+class ContentCollaboratorBase(BaseModel):
+    """Base schema for content collaborators"""
+    user: UserBase
+    permission: str = "read"
+    invited_at: datetime
+    accepted_at: Optional[datetime] = None

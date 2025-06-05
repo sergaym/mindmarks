@@ -103,3 +103,24 @@ def create_content(
         content_page=content_page
     )
 
+
+@router.get("/{content_id}", response_model=ContentRead)
+def get_content_by_id(
+    content_id: UUID,
+    db: DBSession,
+    current_user: User = Depends(get_current_user),
+):
+    """
+    Get content by ID
+    """
+    content_svc = ContentService(db)
+    content = content_svc.get_content_by_id(content_id, UUID(current_user.id))
+    
+    if not content:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Content not found"
+        )
+    
+    return ContentService.content_to_read_schema(content)
+

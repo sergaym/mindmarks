@@ -7,7 +7,7 @@ import {
   Headphones,
   Library,
   MonitorPlay,
-  Home
+  Home,
 } from "lucide-react"
 
 import { NavMain } from "@/components/layout/sidebar/nav-main"
@@ -81,7 +81,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
   const { user, isLoading } = useUser();
   
   return (
-    <Sidebar collapsible="icon" {...props}>
+    <Sidebar variant="inset" collapsible="offcanvas" {...props}>
       <SidebarHeader>
         <TeamSwitcher teams={navData.teams} />
       </SidebarHeader>

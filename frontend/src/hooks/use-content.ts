@@ -1,127 +1,166 @@
 'use client';
 
-import { useState, useEffect } from 'react';
-import { ContentItem, ContentType, User, Status } from '@/types/content';
+import { useState, useEffect, useCallback } from 'react';
+import { ContentItem, ContentType, User, Status, ContentPage } from '@/types/content';
+import { 
+  fetchUserContent, 
+  createContent, 
+  fetchContentById, 
+  updateContent as updateContentApi, 
+  deleteContent, 
+  ContentApiError,
+  CreateContentRequest,
+  UpdateContentRequest 
+} from '@/lib/api/content';
+import { fetchUser } from '@/lib/api/auth';
 
-// Sample user data - will be replaced with API call
-const users: User[] = [
-  {
-    id: "user1",
-    name: "Sergio Ayala",
-    image: "/me.png",
-  },
-  {
-    id: "user2",
-    name: "Jane Doe",
-    image: "/default-avatar.png",
-  }
-];
+// Persistent cache across component mounts for instant UX
+const persistentCache = {
+  content: [] as ContentItem[],
+  user: null as User | null,
+  lastFetch: 0,
+  pages: new Map<string, ContentPage>(),
+};
 
-// Sample content items - will be replaced with API call
-const sampleContent: ContentItem[] = [
-  {
-    id: "content1",
-    name: "Atomic Habits by James Clear",
-    startAt: new Date(2023, 10, 1),
-    endAt: new Date(2023, 10, 30),
-    column: "planned",
-    owner: users[0],
-    type: "book"
-  },
-  {
-    id: "content2",
-    name: "The Psychology of Money",
-    startAt: new Date(2023, 9, 15),
-    endAt: new Date(2023, 11, 15),
-    column: "in-progress",
-    owner: users[0],
-    type: "book"
-  },
-  {
-    id: "content3",
-    name: "Deep Work by Cal Newport",
-    startAt: new Date(2023, 8, 1),
-    endAt: new Date(2023, 8, 30),
-    column: "done",
-    owner: users[0],
-    type: "book"
-  },
-  {
-    id: "content4",
-    name: "How AI Works - Article",
-    startAt: new Date(2023, 10, 5),
-    endAt: new Date(2023, 10, 6),
-    column: "planned",
-    owner: users[1],
-    type: "article"
-  },
-  {
-    id: "content5",
-    name: "The Future of Web Development",
-    startAt: new Date(2023, 10, 10),
-    endAt: new Date(2023, 10, 11),
-    column: "in-progress",
-    owner: users[1],
-    type: "article"
-  },
-  {
-    id: "content6",
-    name: "Learn Next.js in 1 Hour",
-    startAt: new Date(2023, 9, 20),
-    endAt: new Date(2023, 9, 21),
-    column: "done",
-    owner: users[0],
-    type: "video"
-  }
-];
+// Cache timeout (5 minutes)
+const CACHE_TIMEOUT = 5 * 60 * 1000;
 
 /**
- * Custom hook for managing content items
- * In the future, this will connect to a real API instead of using mock data
+ * Integrates with backend API and handles authentication
  */
 export function useContent() {
-  const [content, setContent] = useState<ContentItem[]>([]);
+  // Initialize with cached data for instant display
+  const [content, setContent] = useState<ContentItem[]>(persistentCache.content);
+  const [currentUser, setCurrentUser] = useState<User | null>(persistentCache.user);
   const [status, setStatus] = useState<Status>('idle');
   const [error, setError] = useState<string | null>(null);
+  const [isRefreshing, setIsRefreshing] = useState(false);
 
-  // Simulate API call to fetch content
-  useEffect(() => {
-    async function fetchContent() {
-      setStatus('loading');
-      try {
-        // Simulate API latency
-        await new Promise(resolve => setTimeout(resolve, 500));
-        setContent(sampleContent);
-        setStatus('success');
-      } catch (error) {
-        console.error('Error fetching content:', error);
-        setError('Failed to fetch content');
-        setStatus('error');
+  // Get current user from session/auth with cache
+  const getCurrentUser = useCallback(async (): Promise<User | null> => {
+    if (persistentCache.user) return persistentCache.user;
+
+    try {
+      // Get access token from session storage
+      const accessToken = typeof window !== 'undefined' 
+        ? sessionStorage.getItem('access_token') 
+        : null;
+
+      if (!accessToken) {
+        throw new Error('No access token found');
       }
-    }
 
-    fetchContent();
+      const result = await fetchUser(accessToken);
+      if (result.success) {
+        // Transform auth User to content User format
+        const contentUser: User = {
+          id: result.data.id,
+          name: result.data.name || result.data.email.split('@')[0],
+          image: '/default-avatar.png', // Default image, can be enhanced later
+        };
+        // Cache user
+        persistentCache.user = contentUser;
+        setCurrentUser(contentUser);
+        return contentUser;
+      } else {
+        throw new Error(result.error.message);
+      }
+    } catch (error) {
+      console.error('Failed to fetch current user:', error);
+      setError('Authentication required. Please log in.');
+      return null;
+    }
   }, []);
 
-  // Function to update content item
-  const updateContent = async (updatedContent: ContentItem[]) => {
-    setStatus('loading');
-    try {
-      // Simulate API call to update content
-      await new Promise(resolve => setTimeout(resolve, 300));
-      setContent(updatedContent);
-      setStatus('success');
-      return { status: 'success' as Status };
-    } catch (error) {
-      console.error('Error updating content:', error);
-      setError('Failed to update content');
-      setStatus('error');
-      return { status: 'error' as Status, error: 'Failed to update content' };
-    }
-  };
+  // Check if cache is fresh
+  const isCacheFresh = useCallback(() => {
+    return Date.now() - persistentCache.lastFetch < CACHE_TIMEOUT;
+  }, []);
 
-  // Function to add new content item
-  const addContent = async (newItem: {
+  // Background refresh function
+  const refreshContentInBackground = useCallback(async () => {
+    try {
+      setIsRefreshing(true);
+      const user = await getCurrentUser();
+      if (!user) return;
+
+      const contentItems = await fetchUserContent(user);
+      
+      // Update cache and state
+      persistentCache.content = contentItems;
+      persistentCache.lastFetch = Date.now();
+      setContent(contentItems);
+      setStatus('success');
+    } catch (error) {
+      console.error('Background refresh failed:', error);
+      // Don't show error for background refresh
+    } finally {
+      setIsRefreshing(false);
+    }
+  }, [getCurrentUser]);
+
+  // Fetch content from backend with instant cache display
+  const fetchContent = useCallback(async () => {
+    // If we have fresh cache, show it immediately
+    if (isCacheFresh() && persistentCache.content.length > 0) {
+      setStatus('success');
+      return;
+    }
+
+    // Only show loading if we have no cached data
+    if (persistentCache.content.length === 0) {
+      setStatus('loading');
+    }
+
+    setError(null);
+
+    try {
+      const user = await getCurrentUser();
+      if (!user) {
+        setStatus('error');
+        setError('Authentication required');
+        return;
+      }
+
+      const contentItems = await fetchUserContent(user);
+      
+      // Update cache and state
+      persistentCache.content = contentItems;
+      persistentCache.lastFetch = Date.now();
+      setContent(contentItems);
+      setStatus('success');
+    } catch (error) {
+      console.error('Error fetching content:', error);
+      
+      if (error instanceof ContentApiError) {
+        if (error.status === 401) {
+          setError('Authentication expired. Please log in again.');
+        } else if (error.status === 403) {
+          setError('Access denied. You do not have permission to view this content.');
+        } else {
+          setError(`Failed to load content: ${error.message}`);
+        }
+      } else {
+        setError('Failed to load content. Please check your connection and try again.');
+      }
+      setStatus('error');
+    }
+  }, [getCurrentUser, isCacheFresh]);
+
+  // Load content on mount and when user changes
+  useEffect(() => {
+    fetchContent();
+  }, [fetchContent]);
+
+  // Background refresh when cache is stale
+  useEffect(() => {
+    if (!isCacheFresh() && status === 'success') {
+      refreshContentInBackground();
+    }
+  }, [isCacheFresh, status, refreshContentInBackground]);
+
+  // Add new content item with optimistic updates
+  const addContent = useCallback(async (newItem: {
     name: string;
     type: ContentType;
     startAt: Date;
@@ -131,73 +170,285 @@ export function useContent() {
     description?: string;
     tags?: string[];
     url?: string;
-  }) => {
-    setStatus('loading');
+  }): Promise<{ status: 'success' | 'error'; data?: ContentItem[]; id?: string; error?: string }> => {
     try {
-      // Simulate API call to create content
-      await new Promise(resolve => setTimeout(resolve, 300));
-      
-      // Generate a simple ID - in a real app, this would come from the API
-      const id = `content${content.length + 1}`;
-      
-      // Create a complete content item with proper types
-      const completeItem: ContentItem = {
-        id,
+      const user = await getCurrentUser();
+      if (!user) {
+        return { 
+          status: 'error', 
+          error: 'Authentication required' 
+        };
+      }
+
+      // Create optimistic item for instant UI feedback
+      const optimisticId = `temp-${Date.now()}`;
+      const optimisticItem: ContentItem = {
+        id: optimisticId,
         name: newItem.name,
         type: newItem.type,
         startAt: newItem.startAt,
+        endAt: newItem.endAt,
         column: newItem.column,
         owner: newItem.owner,
-        endAt: newItem.endAt,
         description: newItem.description,
         tags: newItem.tags,
         url: newItem.url,
+        progress: 0,
+        priority: 'medium',
       };
+
+      // Add optimistically to UI immediately
+      const optimisticContent = [...content, optimisticItem];
+      setContent(optimisticContent);
+      persistentCache.content = optimisticContent;
+
+      // For now, create with predefined template content
+      const createRequest: CreateContentRequest = {
+        title: newItem.name,
+        type: newItem.type,
+        url: newItem.url,
+        description: newItem.description,
+        tags: newItem.tags,
+        status: newItem.column === 'planned' ? 'planned' : 
+                newItem.column === 'done' ? 'completed' : 'in-progress',
+        priority: 'medium'
+      };
+
+      const result = await createContent(createRequest, user);
       
-      const newContent = [...content, completeItem];
-      setContent(newContent);
-      setStatus('success');
-      return { status: 'success' as Status, data: newContent };
+      // Replace optimistic item with real one
+      const finalContent = optimisticContent.map(item => 
+        item.id === optimisticId ? result.content : item
+      );
+      setContent(finalContent);
+      persistentCache.content = finalContent;
+      
+      // Cache the content page
+      persistentCache.pages.set(result.id, result.contentPage);
+      
+      return { 
+        status: 'success', 
+        data: finalContent, 
+        id: result.id 
+      };
     } catch (error) {
       console.error('Error adding content:', error);
-      setError('Failed to add content');
-      setStatus('error');
-      return { status: 'error' as Status, error: 'Failed to add content' };
-    }
-  };
-
-  // Function to remove content item
-  const removeContent = async (id: string) => {
-    setStatus('loading');
-    try {
-      // Simulate API call to delete content
-      await new Promise(resolve => setTimeout(resolve, 300));
       
+      // Revert optimistic update on error
+      setContent(content);
+      persistentCache.content = content;
+      
+      let errorMessage = 'Failed to create content';
+      if (error instanceof ContentApiError) {
+        errorMessage = error.message;
+      }
+      
+      setError(errorMessage);
+      
+      return { 
+        status: 'error', 
+        error: errorMessage 
+      };
+    }
+  }, [content, getCurrentUser]);
+
+  // Get content page by ID with caching
+  const getContentPage = useCallback(async (id: string): Promise<ContentPage | null> => {
+    try {
+      // Check cache first
+      const cached = persistentCache.pages.get(id);
+      if (cached) {
+        return cached;
+      }
+
+      const user = await getCurrentUser();
+      if (!user) {
+        throw new Error('Authentication required');
+      }
+
+      const contentPage = await fetchContentById(id, user);
+      
+      if (contentPage) {
+        // Update cache
+        persistentCache.pages.set(id, contentPage);
+      }
+      
+      return contentPage;
+    } catch (error) {
+      console.error('Error fetching content page:', error);
+      
+      if (error instanceof ContentApiError && error.status === 404) {
+        return null;
+      }
+      
+      throw error;
+    }
+  }, [getCurrentUser]);
+
+  // Update content page
+  const updateContentPage = useCallback(async (
+    id: string, 
+    updates: Partial<ContentPage>
+  ): Promise<boolean> => {
+    try {
+      const user = await getCurrentUser();
+      if (!user) {
+        throw new Error('Authentication required');
+      }
+
+      // Transform frontend updates to API format
+      const updateRequest: UpdateContentRequest = {
+        title: updates.title,
+        type: updates.type,
+        url: updates.url,
+        description: updates.summary,
+        tags: updates.tags,
+        status: updates.status,
+        priority: updates.priority,
+        progress: updates.progress,
+        content: updates.content,
+        summary: updates.summary,
+        keyTakeaways: updates.keyTakeaways,
+      };
+
+      // Remove undefined values
+      Object.keys(updateRequest).forEach(key => {
+        if (updateRequest[key as keyof UpdateContentRequest] === undefined) {
+          delete updateRequest[key as keyof UpdateContentRequest];
+        }
+      });
+
+      const updatedPage = await updateContentApi(id, updateRequest, user);
+      
+      // Update cache
+      persistentCache.pages.set(id, updatedPage);
+      
+      // Update content list if the item exists there
+      const contentIndex = content.findIndex(item => item.id === id);
+      if (contentIndex >= 0) {
+        const updatedContent = [...content];
+        updatedContent[contentIndex] = {
+          ...updatedContent[contentIndex],
+          name: updatedPage.title,
+          type: updatedPage.type,
+          url: updatedPage.url,
+          tags: updatedPage.tags,
+          column: updatedPage.status === 'planned' ? 'planned' : 
+                  updatedPage.status === 'completed' ? 'done' : 'in-progress',
+          priority: updatedPage.priority,
+          progress: updatedPage.progress,
+        };
+        setContent(updatedContent);
+      }
+      
+      return true;
+    } catch (error) {
+      console.error('Error updating content page:', error);
+      return false;
+    }
+  }, [content, getCurrentUser]);
+
+  // Update content items (for kanban operations)
+  const updateContent = useCallback(async (updatedContent: ContentItem[]): Promise<{ status: Status }> => {
+    setStatus('loading');
+    
+    try {
+      const user = await getCurrentUser();
+      if (!user) {
+        return { status: 'error' };
+      }
+
+      // Find what changed and update on backend
+      const updatePromises = updatedContent.map(async (item) => {
+        const originalItem = content.find(c => c.id === item.id);
+        if (!originalItem) return;
+
+        // Check if status changed
+        if (originalItem.column !== item.column) {
+          const newStatus = item.column === 'planned' ? 'planned' : 
+                           item.column === 'done' ? 'completed' : 'in-progress';
+          
+          await updateContentApi(item.id, { status: newStatus }, user);
+        }
+      });
+
+      await Promise.all(updatePromises);
+      
+      setContent(updatedContent);
+      setStatus('success');
+      
+      return { status: 'success' };
+    } catch (error) {
+      console.error('Error updating content:', error);
+      setError('Failed to update content');
+      setStatus('error');
+      return { status: 'error' };
+    }
+  }, [content, getCurrentUser]);
+
+  // Remove content item
+  const removeContent = useCallback(async (id: string) => {
+    setStatus('loading');
+    
+    try {
+      const user = await getCurrentUser();
+      if (!user) {
+        throw new Error('Authentication required');
+      }
+      await deleteContent(id, user);
+      
+      // Update local state
       const newContent = content.filter(item => item.id !== id);
       setContent(newContent);
+      
+      // Clear cache
+      persistentCache.pages.delete(id);
+      
       setStatus('success');
       return { status: 'success' as Status, data: newContent };
     } catch (error) {
       console.error('Error removing content:', error);
-      setError('Failed to remove content');
+      
+      let errorMessage = 'Failed to delete content';
+      if (error instanceof ContentApiError) {
+        errorMessage = error.message;
+      }
+      
+      setError(errorMessage);
       setStatus('error');
-      return { status: 'error' as Status, error: 'Failed to remove content' };
+      return { status: 'error' as Status, error: errorMessage };
     }
-  };
+  }, [content, getCurrentUser]);
 
-  // Get current user (for now, just return the first user)
-  const getCurrentUser = () => {
-    return users[0];
-  };
+  // Get current user synchronously (for components that need immediate access)
+  const getCurrentUserSync = useCallback(() => {
+    return currentUser;
+  }, [currentUser]);
+
+  // Refresh content from server
+  const refreshContent = useCallback(() => {
+    // Clear cache
+    persistentCache.pages.clear();
+    persistentCache.lastFetch = 0;
+    
+    // Fetch fresh data
+    return fetchContent();
+  }, [fetchContent]);
 
   return {
     content,
     status,
     error,
+    currentUser,
+    isRefreshing,
     updateContent,
     addContent,
     removeContent,
+    getContentPage,
+    updateContentPage,
+    getCurrentUser: getCurrentUserSync,
+    refreshContent,
+    // Legacy compatibility
     setContent,
-    getCurrentUser
   };
 } 

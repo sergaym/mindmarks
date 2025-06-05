@@ -92,6 +92,7 @@ export type KanbanCardProps<T extends KanbanItemProps = KanbanItemProps> = T & {
   children?: ReactNode;
   className?: string;
   onDelete?: (id: string) => void;
+  onClick?: () => void;
 };
 
 export const KanbanCard = <T extends KanbanItemProps = KanbanItemProps>({
@@ -100,6 +101,7 @@ export const KanbanCard = <T extends KanbanItemProps = KanbanItemProps>({
   children,
   className,
   onDelete,
+  onClick,
 }: KanbanCardProps<T>) => {
   const {
     attributes,
@@ -156,8 +158,10 @@ export const KanbanCard = <T extends KanbanItemProps = KanbanItemProps>({
           className={cn(
             'cursor-grab gap-4 rounded-md p-3 shadow-sm border border-muted/15 bg-card transition-colors group hover:border-muted/30',
             isDragging && 'pointer-events-none cursor-grabbing opacity-30',
+            onClick && 'cursor-pointer',
             className
           )}
+          onClick={onClick}
         >
           {renderCardContent()}
         </Card>
@@ -168,8 +172,10 @@ export const KanbanCard = <T extends KanbanItemProps = KanbanItemProps>({
             className={cn(
               'cursor-grab gap-4 rounded-md p-3 shadow-sm border border-primary/20 ring-1 ring-primary/40 group',
               isDragging && 'cursor-grabbing',
+              onClick && 'cursor-pointer',
               className
             )}
+            onClick={onClick}
           >
             {renderCardContent()}
           </Card>

@@ -128,3 +128,71 @@ class PasswordResetToken(Base):
             datetime.utcnow() < self.expires_at
         )
 
+
+class Content(Base):
+    __tablename__ = "content"
+    
+    id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
+    title = Column(String(255), nullable=False)
+    type = Column(Enum(ContentTypeEnum), nullable=False)
+    url = Column(String(1024), nullable=True)
+    summary = Column(Text, nullable=True)
+    tags = Column(JSONB, default=list, nullable=False)  # Array of strings
+    status = Column(Enum(ContentStatusEnum), default=ContentStatusEnum.planned, nullable=False)
+    priority = Column(Enum(ContentPriorityEnum), default=ContentPriorityEnum.medium, nullable=False)
+    
+    # Editor content stored as structured data
+    content = Column(JSONB, default=list, nullable=False)  # Array of EditorContent objects
+    
+    # Additional metadata
+    key_takeaways = Column(JSONB, default=list, nullable=False)  # Array of strings
+    author = Column(String(255), nullable=True)
+    published_date = Column(DateTime, nullable=True)
+    estimated_read_time = Column(Integer, nullable=True)  # in minutes
+    rating = Column(Float, nullable=True)  # 0-5 rating
+    progress = Column(Float, default=0.0, nullable=False)  # 0-100 percentage
+    
+    # Visibility and collaboration
+    is_public = Column(Boolean, default=False, nullable=False)
+    
+    # Timestamps and ownership
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
+    created_by_id = Column(String, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    last_edited_by_id = Column(String, ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    
+    # Relationships
+    created_by = relationship("User", foreign_keys=[created_by_id], back_populates="created_content")
+    last_edited_by = relationship("User", foreign_keys=[last_edited_by_id], back_populates="last_edited_content")
+    collaborators = relationship("ContentCollaborator", back_populates="content", cascade="all, delete-orphan")
+    
+    __table_args__ = (
+        Index('content_created_by_id_idx', 'created_by_id'),
+        Index('content_type_idx', 'type'),
+        Index('content_status_idx', 'status'),
+        Index('content_priority_idx', 'priority'),
+        Index('content_created_at_idx', 'created_at'),
+        Index('content_tags_gin_idx', 'tags', postgresql_using='gin'),  # For tag searches
+    )
+
+
+class ContentCollaborator(Base):
+    __tablename__ = "content_collaborators"
+    
+    id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
+    content_id = Column(String, ForeignKey("content.id", ondelete="CASCADE"), nullable=False)
+    user_id = Column(String, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    permission = Column(String(50), default="read", nullable=False)  # read, write, admin
+    invited_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    accepted_at = Column(DateTime, nullable=True)
+    
+    # Relationships
+    content = relationship("Content", back_populates="collaborators")
+    user = relationship("User", back_populates="collaborated_content")
+    
+    __table_args__ = (
+        UniqueConstraint('content_id', 'user_id', name='unique_content_collaborator'),
+        Index('content_collaborators_content_id_idx', 'content_id'),
+        Index('content_collaborators_user_id_idx', 'user_id'),
+    )
+

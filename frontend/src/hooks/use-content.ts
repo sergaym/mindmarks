@@ -391,15 +391,18 @@ export function useContent() {
     setStatus('loading');
     
     try {
-      await deleteContent(id);
+      const user = await getCurrentUser();
+      if (!user) {
+        throw new Error('Authentication required');
+      }
+      await deleteContent(id, user);
       
       // Update local state
       const newContent = content.filter(item => item.id !== id);
       setContent(newContent);
       
       // Clear cache
-      contentPageCache.delete(id);
-      cacheTimestamps.delete(id);
+      persistentCache.pages.delete(id);
       
       setStatus('success');
       return { status: 'success' as Status, data: newContent };
@@ -425,8 +428,8 @@ export function useContent() {
   // Refresh content from server
   const refreshContent = useCallback(() => {
     // Clear cache
-    contentPageCache.clear();
-    cacheTimestamps.clear();
+    persistentCache.pages.clear();
+    persistentCache.lastFetch = 0;
     
     // Fetch fresh data
     return fetchContent();
@@ -437,6 +440,7 @@ export function useContent() {
     status,
     error,
     currentUser,
+    isRefreshing,
     updateContent,
     addContent,
     removeContent,

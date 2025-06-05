@@ -94,9 +94,9 @@ export default function DashboardPage() {
     window.location.reload();
   }, []);
 
-  // Loading state
+  // Loading state - only show skeleton if no cached data
   if (status === 'loading' && content.length === 0) {
-    return <LoadingState message="Loading your content..." />;
+    return <SkeletonDashboard />;
   }
 
   // Error state
@@ -109,13 +109,24 @@ export default function DashboardPage() {
     );
   }
 
-  // Main content
+  // Main content with instant display
   return (
     <div className="flex flex-1 flex-col gap-4 p-4 overflow-hidden">
-      <DashboardHeader
-        onAddContent={handleAddContent}
-        currentUser={getCurrentUser()}
-      />
+      {/* Show subtle refresh indicator if background refresh is happening */}
+      {isRefreshing && (
+        <div className="absolute top-4 right-4 z-50">
+          <div className="bg-blue-100 text-blue-800 px-3 py-1 rounded-md text-sm animate-pulse">
+            Syncing...
+          </div>
+        </div>
+      )}
+
+      {currentUser && (
+        <DashboardHeader
+          onAddContent={handleAddContent}
+          currentUser={currentUser}
+        />
+      )}
       
       <DashboardContent
         content={content}

@@ -241,3 +241,59 @@ function getDefaultContent(type: ContentType): EditorContent[] {
   }
 }
 
+/**
+ * Fetch user's content items
+ */
+export async function fetchUserContent(user: User): Promise<ContentItem[]> {
+  try {
+    // For now, return mock data since backend endpoints may not be fully implemented
+    // In a real implementation, this would call: /api/v1/content/user/${user.id}
+    
+    const mockContentPages: ContentPage[] = [
+      {
+        id: '1',
+        title: 'Clean Code',
+        type: 'book',
+        tags: ['programming', 'best-practices'],
+        status: 'in-progress',
+        priority: 'high',
+        content: getDefaultContent('book'),
+        createdAt: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000),
+        updatedAt: new Date(),
+        createdBy: user,
+        lastEditedBy: user,
+        isPublic: false,
+        collaborators: [],
+        progress: 45,
+        author: 'Robert C. Martin',
+        estimatedReadTime: 480,
+      },
+      {
+        id: '2',
+        title: 'React Best Practices',
+        type: 'article',
+        url: 'https://example.com/react-best-practices',
+        tags: ['react', 'frontend'],
+        status: 'planned',
+        priority: 'medium',
+        content: getDefaultContent('article'),
+        createdAt: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000),
+        updatedAt: new Date(),
+        createdBy: user,
+        lastEditedBy: user,
+        isPublic: false,
+        collaborators: [],
+        estimatedReadTime: 15,
+      },
+    ];
+
+    return mockContentPages.map(contentPageToItem);
+    
+    // Real implementation would be:
+    // const response = await apiRequest<ContentPage[]>(`/api/v1/content/user/${user.id}`);
+    // return response.map(contentPageToItem);
+  } catch (error) {
+    console.error('Error fetching user content:', error);
+    throw error;
+  }
+}

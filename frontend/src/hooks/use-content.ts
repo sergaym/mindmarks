@@ -418,7 +418,7 @@ export function useContent() {
       setStatus('error');
       return { status: 'error' as Status, error: errorMessage };
     }
-  }, [content]);
+  }, [content, getCurrentUser]);
 
   // Get current user synchronously (for components that need immediate access)
   const getCurrentUserSync = useCallback(() => {

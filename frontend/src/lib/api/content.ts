@@ -425,3 +425,18 @@ export async function updateContent(
   }
 }
 
+/**
+ * Delete content item
+ */
+export async function deleteContent(id: string, user: User): Promise<void> {
+  try {
+    // Mock implementation - just return success
+    console.log(`Deleting content ${id} for user ${user.id}`);
+
+    // Real implementation would be:
+    // await apiRequest(`/api/v1/content/${id}`, 'DELETE');
+  } catch (error) {
+    console.error('Error deleting content:', error);
+    throw error;
+  }
+} 

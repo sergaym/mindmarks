@@ -122,3 +122,122 @@ async function apiRequest<T>(
   return response.json() as T;
 }
 
+/**
+ * Convert ContentPage to ContentItem for dashboard view
+ */
+function contentPageToItem(page: ContentPage): ContentItem {
+  return {
+    id: page.id,
+    name: page.title,
+    startAt: page.createdAt,
+    endAt: undefined, // Can be enhanced based on content type
+    column: page.status,
+    owner: page.createdBy,
+    type: page.type,
+    description: page.summary,
+    tags: page.tags,
+    url: page.url,
+    progress: page.progress,
+    priority: page.priority,
+  };
+}
+
+/**
+ * Generate default content template based on content type
+ */
+function getDefaultContent(type: ContentType): EditorContent[] {
+  const baseContent: EditorContent[] = [
+    {
+      type: 'h1',
+      children: [{ text: 'Overview' }],
+    },
+    {
+      type: 'p',
+      children: [{ text: 'Add your notes and insights here...' }],
+    },
+  ];
+
+  switch (type) {
+    case 'book':
+      return [
+        ...baseContent,
+        {
+          type: 'h2',
+          children: [{ text: 'Key Takeaways' }],
+        },
+        {
+          type: 'ul',
+          children: [
+            {
+              type: 'li',
+              children: [{ text: 'Main insight 1' }],
+            },
+            {
+              type: 'li',
+              children: [{ text: 'Main insight 2' }],
+            },
+          ],
+        },
+        {
+          type: 'h2',
+          children: [{ text: 'Quotes & Highlights' }],
+        },
+        {
+          type: 'p',
+          children: [{ text: 'Important quotes and highlighted passages...' }],
+        },
+      ];
+    
+    case 'article':
+      return [
+        ...baseContent,
+        {
+          type: 'h2',
+          children: [{ text: 'Summary' }],
+        },
+        {
+          type: 'p',
+          children: [{ text: 'Article summary...' }],
+        },
+        {
+          type: 'h2',
+          children: [{ text: 'Key Points' }],
+        },
+        {
+          type: 'ul',
+          children: [
+            {
+              type: 'li',
+              children: [{ text: 'Point 1' }],
+            },
+          ],
+        },
+      ];
+    
+    case 'video':
+    case 'podcast':
+      return [
+        ...baseContent,
+        {
+          type: 'h2',
+          children: [{ text: 'Timestamps' }],
+        },
+        {
+          type: 'p',
+          children: [{ text: '00:00 - Introduction' }],
+        },
+        {
+          type: 'h2',
+          children: [{ text: 'Notes' }],
+        },
+        {
+          type: 'p',
+          children: [{ text: 'Your notes here...' }],
+        },
+      ];
+    
+    default:
+      return baseContent;
+  }
+}
+

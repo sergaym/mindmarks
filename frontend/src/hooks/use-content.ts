@@ -99,9 +99,19 @@ export function useContent() {
     }
   }, [getCurrentUser]);
 
-  // Fetch content from backend
+  // Fetch content from backend with instant cache display
   const fetchContent = useCallback(async () => {
-    setStatus('loading');
+    // If we have fresh cache, show it immediately
+    if (isCacheFresh() && persistentCache.content.length > 0) {
+      setStatus('success');
+      return;
+    }
+
+    // Only show loading if we have no cached data
+    if (persistentCache.content.length === 0) {
+      setStatus('loading');
+    }
+
     setError(null);
 
     try {
@@ -113,6 +123,10 @@ export function useContent() {
       }
 
       const contentItems = await fetchUserContent(user);
+      
+      // Update cache and state
+      persistentCache.content = contentItems;
+      persistentCache.lastFetch = Date.now();
       setContent(contentItems);
       setStatus('success');
     } catch (error) {
@@ -131,14 +145,21 @@ export function useContent() {
       }
       setStatus('error');
     }
-  }, [getCurrentUser]);
+  }, [getCurrentUser, isCacheFresh]);
 
   // Load content on mount and when user changes
   useEffect(() => {
     fetchContent();
   }, [fetchContent]);
 
-  // Add new content item
+  // Background refresh when cache is stale
+  useEffect(() => {
+    if (!isCacheFresh() && status === 'success') {
+      refreshContentInBackground();
+    }
+  }, [isCacheFresh, status, refreshContentInBackground]);
+
+  // Add new content item with optimistic updates
   const addContent = useCallback(async (newItem: {
     name: string;
     type: ContentType;

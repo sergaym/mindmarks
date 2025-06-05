@@ -256,10 +256,8 @@ export function useContent() {
   const getContentPage = useCallback(async (id: string): Promise<ContentPage | null> => {
     try {
       // Check cache first
-      const cached = contentPageCache.get(id);
-      const cacheTime = cacheTimestamps.get(id);
-      
-      if (cached && cacheTime && (Date.now() - cacheTime) < CACHE_TIMEOUT) {
+      const cached = persistentCache.pages.get(id);
+      if (cached) {
         return cached;
       }
 
@@ -272,8 +270,7 @@ export function useContent() {
       
       if (contentPage) {
         // Update cache
-        contentPageCache.set(id, contentPage);
-        cacheTimestamps.set(id, Date.now());
+        persistentCache.pages.set(id, contentPage);
       }
       
       return contentPage;
@@ -324,8 +321,7 @@ export function useContent() {
       const updatedPage = await updateContentApi(id, updateRequest, user);
       
       // Update cache
-      contentPageCache.set(id, updatedPage);
-      cacheTimestamps.set(id, Date.now());
+      persistentCache.pages.set(id, updatedPage);
       
       // Update content list if the item exists there
       const contentIndex = content.findIndex(item => item.id === id);

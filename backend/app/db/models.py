@@ -40,7 +40,7 @@ class ContentTypeEnum(enum.Enum):
 class ContentStatusEnum(enum.Enum):
     """Content status for tracking progress"""
     planned = "planned"
-    in_progress = "in-progress"
+    in_progress = "in_progress"
     completed = "completed"
     archived = "archived"
 

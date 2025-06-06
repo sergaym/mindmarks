@@ -172,3 +172,56 @@ class ContentService:
         self.db.commit()
         return True
 
+    def get_content_stats(self, user_id: UUID) -> ContentStats:
+        """Get content statistics for a user"""
+        base_query = self.db.query(Content).filter(
+            or_(
+                Content.created_by_id == str(user_id),
+                Content.collaborators.any(ContentCollaborator.user_id == str(user_id))
+            )
+        )
+
+        # Total content
+        total_content = base_query.count()
+
+        # By status
+        by_status = {}
+        for status in ContentStatusEnum:
+            count = base_query.filter(Content.status == status.value).count()
+            by_status[status.value] = count
+
+        # By type
+        by_type = {}
+        for content_type in ContentTypeEnum:
+            count = base_query.filter(Content.type == content_type.value).count()
+            by_type[content_type.value] = count
+
+        # By priority
+        by_priority = {}
+        for priority in ContentPriorityEnum:
+            count = base_query.filter(Content.priority == priority.value).count()
+            by_priority[priority.value] = count
+
+        # Average progress
+        avg_progress = base_query.with_entities(func.avg(Content.progress)).scalar() or 0.0
+
+        # Completed this month
+        month_start = datetime.utcnow().replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+        completed_this_month = base_query.filter(
+            Content.status == ContentStatusEnum.completed.value,
+            Content.updated_at >= month_start
+        ).count()
+
+        # Reading streak (simplified - days with content activity)
+        reading_streak = self._calculate_reading_streak(user_id)
+
+        return ContentStats(
+            total_content=total_content,
+            by_status=by_status,
+            by_type=by_type,
+            by_priority=by_priority,
+            avg_progress=avg_progress,
+            completed_this_month=completed_this_month,
+            reading_streak=reading_streak
+        )
+

@@ -225,3 +225,29 @@ class ContentService:
             reading_streak=reading_streak
         )
 
+    def _calculate_reading_streak(self, user_id: UUID) -> int:
+        """Calculate reading streak (days with content updates)"""
+        # Simplified implementation - count consecutive days with updates
+        # This could be enhanced with more sophisticated logic
+        current_date = datetime.utcnow().date()
+        streak = 0
+        
+        for i in range(365):  # Check up to a year
+            check_date = current_date - timedelta(days=i)
+            
+            # Check if user had any content activity on this date
+            activity = self.db.query(Content).filter(
+                or_(
+                    Content.created_by_id == str(user_id),
+                    Content.collaborators.any(ContentCollaborator.user_id == str(user_id))
+                ),
+                func.date(Content.updated_at) == check_date
+            ).first()
+            
+            if activity:
+                streak += 1
+            elif i > 0:  # Don't break on first day if no activity today
+                break
+        
+        return streak
+

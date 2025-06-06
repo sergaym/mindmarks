@@ -174,7 +174,7 @@ def get_content_by_id(
     return ContentService.content_to_read_schema(content)
 
 
-@router.put("/{content_id}", response_model=ContentRead)
+@router.patch("/{content_id}", response_model=ContentRead)
 def update_content(
     content_id: UUID,
     content_in: ContentUpdate,

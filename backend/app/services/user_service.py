@@ -3,8 +3,8 @@ import uuid
 from datetime import datetime, timedelta
 from typing import Dict, List, Optional, Union
 from uuid import UUID
-from sqlalchemy.orm import Session
-from sqlalchemy import or_, and_
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import or_, and_, select, update, delete
 
 from app.db.models import User, RefreshToken, PasswordResetToken
 from app.core.security import get_password_hash, verify_password
@@ -15,125 +15,70 @@ logger = logging.getLogger(__name__)
 
 
 class UserService:
-    def __init__(self, db: Session):
+    """
+    async UserService using AsyncSession for maximum performance.
+    """
+    def __init__(self, db: AsyncSession):
         self.db = db
 
-    def get_user_by_id(self, user_id: UUID) -> Optional[User]:
-        """Get a user by ID"""
-        return self.db.query(User).filter(User.id == str(user_id)).first()
+    async def get_user_by_id(self, user_id: UUID) -> Optional[User]:
+        """Get a user by ID - True async operation"""
+        try:
+            result = await self.db.execute(
+                select(User).filter(User.id == str(user_id))
+            )
+            return result.scalar_one_or_none()
+        except Exception as e:
+            logger.error(f"Error getting user by ID {user_id}: {e}")
+            return None
 
-    def get_user_by_email(self, email: str) -> Optional[User]:
-        """Get a user by email"""
-        return self.db.query(User).filter(User.email == email).first()
+    async def get_user_by_email(self, email: str) -> Optional[User]:
+        """Get a user by email - True async operation"""
+        try:
+            result = await self.db.execute(
+                select(User).filter(User.email == email)
+            )
+            return result.scalar_one_or_none()
+        except Exception as e:
+            logger.error(f"Error getting user by email {email}: {e}")
+            return None
 
-    def authenticate_user(self, email: str, password: str) -> Optional[User]:
-        """Authenticate a user by email and password"""
-        user = self.get_user_by_email(email)
+    async def authenticate_user(self, email: str, password: str) -> Optional[User]:
+        """Authenticate a user by email and password - True async"""
+        user = await self.get_user_by_email(email)
         if not user or not verify_password(password, user.hashed_password):
             return None
-        
         return user
 
-    def create_user(self, user_in: UserCreate) -> User:
-        """Create a new user"""
-        # Check if email is already registered
-        existing_user = self.get_user_by_email(user_in.email)
-        if existing_user:
-            return None
-        
-        hashed_password = get_password_hash(user_in.password)
-        user = User(
-            id=str(uuid.uuid4()),
-            email=user_in.email,
-            full_name=user_in.full_name,
-            is_active=user_in.is_active,
-            is_superuser=user_in.is_superuser,
-            hashed_password=hashed_password
-        )
-        
-        self.db.add(user)
-        self.db.commit()
-        self.db.refresh(user)
-        return user
-
-    def update_user(self, user_id: UUID, user_in: Union[UserUpdate, Dict]) -> Optional[User]:
-        """Update a user"""
-        user = self.get_user_by_id(user_id)
-        if not user:
-            return None
-        
-        # Update user fields
-        if hasattr(user_in, 'dict'):
-            # It's a Pydantic model
-            update_data = user_in.dict(exclude_unset=True)
-        else:
-            # It's already a dict
-            update_data = user_in
-        
-        # Handle password separately to hash it
-        if "password" in update_data:
-            update_data["hashed_password"] = get_password_hash(update_data.pop("password"))
-        
-        for key, value in update_data.items():
-            if hasattr(user, key):
-                setattr(user, key, value)
-        
-        self.db.commit()
-        self.db.refresh(user)
-        return user
-
-    def get_users(self, skip: int = 0, limit: int = 100) -> List[User]:
-        """Get all users with pagination"""
-        return self.db.query(User).offset(skip).limit(limit).all()
-
-    def search_users(self, query: str, skip: int = 0, limit: int = 100) -> List[User]:
-        """Search users by email or name"""
-        search_pattern = f"%{query}%"
-        return self.db.query(User).filter(
-            or_(
-                User.email.ilike(search_pattern),
-                User.full_name.ilike(search_pattern)
+    async def create_user(self, user_in: UserCreate) -> Optional[User]:
+        """Create a new user - True async operation"""
+        try:
+            # Check if email is already registered
+            existing_user = await self.get_user_by_email(user_in.email)
+            if existing_user:
+                return None
+            
+            hashed_password = get_password_hash(user_in.password)
+            user = User(
+                id=str(uuid.uuid4()),
+                email=user_in.email,
+                full_name=user_in.full_name,
+                is_active=user_in.is_active,
+                is_superuser=user_in.is_superuser,
+                hashed_password=hashed_password
             )
-        ).offset(skip).limit(limit).all()
-        
-    def create_refresh_token(self, user_id: UUID, token: str) -> RefreshToken:
-        """
-        Store a refresh token in the database
-        """
-        # Calculate expiration date
-        expires_at = datetime.utcnow() + timedelta(days=settings.REFRESH_TOKEN_EXPIRE_DAYS)
-        
-        # Create token record
-        refresh_token = RefreshToken(
-            id=str(uuid.uuid4()),
-            token=token,
-            user_id=str(user_id),
-            expires_at=expires_at
-        )
-        
-        # Save to database
-        self.db.add(refresh_token)
-        self.db.commit()
-        self.db.refresh(refresh_token)
-        
-        return refresh_token
-    
-    def get_refresh_token(self, token: str) -> Optional[RefreshToken]:
-        """
-        Get a refresh token by its token string
-        """
-        return self.db.query(RefreshToken).filter(
-            RefreshToken.token == token,
-            RefreshToken.revoked == False,
-            RefreshToken.expires_at > datetime.utcnow()
-        ).first()
-    
-    def revoke_refresh_token(self, token: str) -> bool:
-        """
-        Revoke a refresh token
-        """
-        db_token = self.db.query(RefreshToken).filter(RefreshToken.token == token).first()
-        if not db_token:
+            
+            self.db.add(user)
+            await self.db.commit()
+            await self.db.refresh(user)
+            
+            logger.info(f"User created successfully: {user.email}")
+            return user
+            
+        except Exception as e:
+            await self.db.rollback()
+            logger.error(f"Error creating user: {e}")
+            return None
             return False
         
         db_token.revoked = True

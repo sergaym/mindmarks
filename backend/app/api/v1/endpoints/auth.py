@@ -277,21 +277,58 @@ async def reset_password(
 
 
 @router.delete("/cleanup-expired-tokens")
-async def cleanup_expired_tokens(session: DBSession):
+async def cleanup_expired_tokens(session: AsyncDBSession):
     """
-    Cleanup expired password reset tokens
-    Should be called periodically via cron job or maintenance tasks
+    Admin endpoint to cleanup expired tokens
+    True async implementation with AsyncSession for maximum performance
+    This should typically be called via a scheduled job
     """
     try:
         user_svc = UserService(session)
-        deleted_count = user_svc.cleanup_expired_reset_tokens()
         
-        logger.info(f"Cleaned up {deleted_count} expired password reset tokens")
-        return {"message": f"Cleaned up {deleted_count} expired tokens"}
+        # Cleanup expired refresh tokens
+        refresh_count = await user_svc.cleanup_expired_refresh_tokens()
+        
+        # Cleanup expired reset tokens
+        reset_count = await user_svc.cleanup_expired_reset_tokens()
+        
+        logger.info(f"Token cleanup completed: {refresh_count} refresh, {reset_count} reset tokens removed")
+        return {
+            "message": "Token cleanup completed successfully",
+            "expired_refresh_tokens_removed": refresh_count,
+            "expired_reset_tokens_removed": reset_count
+        }
         
     except Exception as e:
-        logger.error(f"Error cleaning up expired tokens: {str(e)}")
+        logger.error(f"Error in cleanup_expired_tokens: {str(e)}")
         raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, 
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Failed to cleanup expired tokens"
+        )
+
+
+@router.get("/health")
+async def auth_health_check(session: AsyncDBSession):
+    """
+    Health check endpoint for authentication service
+    Tests async database connectivity and basic operations
+    """
+    try:
+        user_svc = UserService(session)
+        
+        # Test basic database connectivity
+        users = await user_svc.get_users(limit=1)
+        
+        return {
+            "status": "healthy",
+            "database": "connected",
+            "async_operations": "functional",
+            "timestamp": logger.info("Auth health check passed")
+        }
+        
+    except Exception as e:
+        logger.error(f"Auth health check failed: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Authentication service unhealthy"
         ) 

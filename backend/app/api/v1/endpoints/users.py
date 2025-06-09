@@ -104,3 +104,38 @@ async def read_user_by_id(
     return UserRead.from_orm(user)
 
 
+@router.delete("/{user_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_user(
+    user_id: UUID,
+    db: AsyncDBSession,
+    current_user: User = Depends(get_current_active_superuser),
+):
+    """
+    Delete a user - superuser only
+    True async implementation with AsyncSession for maximum performance
+    Includes cascade deletion of associated data
+    """
+    user_svc = UserService(db)
+    
+    # Prevent self-deletion
+    if str(user_id) == current_user.id:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Cannot delete your own account"
+        )
+    
+    # Check if user exists
+    user = await user_svc.get_user_by_id(user_id)
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, 
+            detail="User not found"
+        )
+    
+    # Delete user
+    success = await user_svc.delete_user(user_id)
+    if not success:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to delete user"
+        )

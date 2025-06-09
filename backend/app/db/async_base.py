@@ -110,3 +110,97 @@ except Exception as e:
     logger.error(f"Error creating async database engine: {e}")
     raise
 
+# Create async session factory
+AsyncSessionLocal = async_sessionmaker(
+    bind=async_engine,
+    class_=AsyncSession,
+    autocommit=False,
+    autoflush=False,
+    expire_on_commit=False  # Important for async operations
+)
+
+async def get_async_db() -> AsyncGenerator[AsyncSession, None]:
+    """
+    Async dependency injection for FastAPI endpoints.
+    Provides AsyncSession for true async database operations.
+    """
+    async with AsyncSessionLocal() as session:
+        try:
+            yield session
+        except Exception as e:
+            await session.rollback()
+            logger.error(f"Database session error: {e}")
+            raise
+        finally:
+            await session.close()
+
+# Type alias for dependency injection
+from typing import Annotated
+AsyncDBSession = Annotated[AsyncSession, Depends(get_async_db)]
+
+@asynccontextmanager
+async def get_async_db_session():
+    """
+    Async context manager for database session.
+    Use this for operations outside of FastAPI endpoints.
+    """
+    async with AsyncSessionLocal() as session:
+        try:
+            yield session
+        except Exception as e:
+            await session.rollback()
+            logger.error(f"Database session error: {e}")
+            raise
+        finally:
+            await session.close()
+
+async def init_async_db():
+    """
+    Initialize async database connection and test connectivity.
+    """
+    try:
+        async with async_engine.begin() as conn:
+            # Test async connection
+            result = await conn.execute(text("SELECT 1"))
+            result.fetchone()  # fetchone() is synchronous, not async
+        logger.info("Async database connection established successfully")
+    except Exception as e:
+        logger.error(f"Error connecting to async database: {e}")
+        raise
+
+async def create_async_tables():
+    """
+    Create all defined tables in the database using async engine.
+    Note: This requires importing Base from the main models file.
+    """
+    try:
+        from app.db.models import Base
+        async with async_engine.begin() as conn:
+            await conn.run_sync(Base.metadata.create_all)
+        logger.info("Database tables created successfully")
+    except Exception as e:
+        logger.error(f"Error creating database tables: {e}")
+        raise
+
+async def close_async_db():
+    """
+    Close async database connections gracefully.
+    Call this during application shutdown.
+    """
+    await async_engine.dispose()
+    logger.info("Async database connections closed")
+
+# Health check function
+async def check_async_db_health() -> bool:
+    """
+    Check if async database is healthy and responsive.
+    Returns True if healthy, False otherwise.
+    """
+    try:
+        async with async_engine.begin() as conn:
+            result = await conn.execute(text("SELECT 1"))
+            result.fetchone()  # fetchone() is synchronous, not async
+        return True
+    except Exception as e:
+        logger.error(f"Database health check failed: {e}")
+        return False 

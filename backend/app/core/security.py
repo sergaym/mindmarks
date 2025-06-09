@@ -138,10 +138,11 @@ def validate_refresh_token(token: str) -> dict:
 
 async def get_current_user(
     token: str = Depends(oauth2_scheme),
-    db: Session = Depends(get_db)
+    db: AsyncSession = Depends(get_async_db)
 ) -> User:
     """
     Decode the JWT and return the User object, or raise HTTPException if invalid.
+    True async implementation with AsyncSession for maximum performance.
     """
     return await get_user_from_token(token, db)
 
@@ -166,9 +167,11 @@ async def get_current_active_superuser(
     return current_user
 
 
-async def get_user_from_token(token: str, db: Session) -> User:
+async def get_user_from_token(token: str, db: AsyncSession) -> User:
     """
-    Decodes the JWT token, fetches the user from the DB, or raises if invalid.
+    Decodes the JWT token, fetches the user from the DB using async operations, 
+    or raises HTTPException if invalid.
+    True async implementation for maximum performance.
     """
     try:
         payload = jwt.decode(token, settings.SECRET_KEY, algorithms=[ALGORITHM])
@@ -178,18 +181,28 @@ async def get_user_from_token(token: str, db: Session) -> User:
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 detail="Invalid or expired token",
             )
-        user = db.query(User).filter(User.id == user_id).first()
+        
+        # Use async database operation
+        result = await db.execute(
+            select(User).filter(User.id == user_id)
+        )
+        user = result.scalar_one_or_none()
+        
         if user is None:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail="User not found",
             )
         return user
+        
     except jwt.ExpiredSignatureError:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Token has expired",
         )
+    except HTTPException:
+        # Re-raise HTTP exceptions
+        raise
     except Exception as e:
         logger.error(f"JWT decode error: {e}")
         raise HTTPException(

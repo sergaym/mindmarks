@@ -79,112 +79,73 @@ class UserService:
             await self.db.rollback()
             logger.error(f"Error creating user: {e}")
             return None
-            return False
-        
-        db_token.revoked = True
-        self.db.commit()
-        return True
-    
-    def revoke_all_user_refresh_tokens(self, user_id: UUID) -> int:
-        """
-        Revoke all refresh tokens for a user, returns count of revoked tokens
-        """
-        result = self.db.query(RefreshToken).filter(
-            RefreshToken.user_id == str(user_id),
-            RefreshToken.revoked == False
-        ).update({"revoked": True})
-        
-        self.db.commit()
-        return result
 
-    def create_password_reset_token(self, email: str) -> Optional[str]:
-        """
-        Create a password reset token for a user
-        Returns the token string if successful, None if user doesn't exist
-        """
-        user = self.get_user_by_email(email)
-        if not user:
+    async def update_user(self, user_id: UUID, user_in: Union[UserUpdate, Dict]) -> Optional[User]:
+        """Update a user - True async operation"""
+        try:
+            user = await self.get_user_by_id(user_id)
+            if not user:
+                return None
+            
+            # Update user fields
+            if hasattr(user_in, 'dict'):
+                update_data = user_in.dict(exclude_unset=True)
+            else:
+                update_data = user_in
+            
+            # Handle password separately to hash it
+            if "password" in update_data:
+                update_data["hashed_password"] = get_password_hash(update_data.pop("password"))
+            
+            # Update timestamp
+            update_data["updated_at"] = datetime.utcnow()
+            
+            for key, value in update_data.items():
+                if hasattr(user, key):
+                    setattr(user, key, value)
+            
+            await self.db.commit()
+            await self.db.refresh(user)
+            
+            logger.info(f"User updated successfully: {user.email}")
+            return user
+            
+        except Exception as e:
+            await self.db.rollback()
+            logger.error(f"Error updating user {user_id}: {e}")
             return None
-        
-        # Invalidate any existing tokens for this user
-        self.db.query(PasswordResetToken).filter(
-            and_(
-                PasswordResetToken.user_email == email.lower(),
-                PasswordResetToken.used == False,
-                PasswordResetToken.expires_at > datetime.utcnow()
+
+    async def delete_user(self, user_id: UUID) -> bool:
+        """Delete a user and associated data - True async operation"""
+        try:
+            user = await self.get_user_by_id(user_id)
+            if not user:
+                return False
+            
+            # Delete associated refresh tokens
+            await self.db.execute(
+                delete(RefreshToken).filter(RefreshToken.user_id == str(user_id))
             )
-        ).update({"used": True})
-        
-        # Create new reset token
-        reset_record, reset_token = PasswordResetToken.create_token(email.lower())
-        self.db.add(reset_record)
-        self.db.commit()
-        
-        logger.info(f"Password reset token created for user: {email}")
-        return reset_token
-    
-    def verify_and_use_reset_token(self, token: str, new_password: str) -> bool:
-        """
-        Verify and use a password reset token to change the user's password
-        Returns True if successful, False otherwise
-        """
-        # Find valid reset token
-        reset_record = self.db.query(PasswordResetToken).filter(
-            and_(
-                PasswordResetToken.used == False,
-                PasswordResetToken.expires_at > datetime.utcnow()
+            
+            # Delete associated password reset tokens
+            await self.db.execute(
+                delete(PasswordResetToken).filter(PasswordResetToken.user_email == user.email)
             )
-        ).first()
-        
-        if not reset_record:
-            logger.warning("Invalid or expired reset token attempted")
+            
+            # Delete the user
+            await self.db.execute(
+                delete(User).filter(User.id == str(user_id))
+            )
+            await self.db.commit()
+            
+            logger.info(f"User {user_id} and associated data deleted successfully")
+            return True
+            
+        except Exception as e:
+            await self.db.rollback()
+            logger.error(f"Failed to delete user {user_id}: {e}")
             return False
-        
-        # Verify token
-        if not reset_record.verify_token(token):
-            logger.warning("Invalid reset token verification failed")
-            return False
-        
-        # Find user
-        user = self.get_user_by_email(reset_record.user_email)
-        if not user:
-            # Mark token as used and return False
-            reset_record.used = True
-            self.db.commit()
-            logger.error(f"User not found for reset token: {reset_record.user_email}")
-            return False
-        
-        # Update user password
-        user.hashed_password = get_password_hash(new_password)
-        user.updated_at = datetime.utcnow()
-        
-        # Mark token as used
-        reset_record.used = True
-        
-        # Revoke all existing refresh tokens for security
-        self.revoke_all_user_refresh_tokens(UUID(user.id))
-        
-        # Commit changes
-        self.db.commit()
-        
-        logger.info(f"Password successfully reset for user: {user.email}")
-        return True
-    
-    def cleanup_expired_reset_tokens(self) -> int:
-        """
-        Cleanup expired password reset tokens
-        Returns the number of deleted tokens
-        """
-        deleted_count = self.db.query(PasswordResetToken).filter(
-            PasswordResetToken.expires_at < datetime.utcnow()
-        ).delete()
-        
-        self.db.commit()
-        
-        if deleted_count > 0:
-            logger.info(f"Cleaned up {deleted_count} expired password reset tokens")
-        
-        return deleted_count
+
 
     @staticmethod
     def is_active_user(user: User) -> bool:

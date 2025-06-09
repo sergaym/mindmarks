@@ -15,21 +15,22 @@ from app.services.user_service import UserService
 from app.services.email_service import email_service
 from app.core.config import settings
 from app.core.security import create_access_token, verify_password, create_refresh_token, validate_refresh_token
-from app.db.base import DBSession
+from app.db.async_base import AsyncDBSession
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
 
 
 @router.post("/login", response_model=Token)
-def login_for_access_token(
-    session: DBSession, form_data: OAuth2PasswordRequestForm = Depends()
+async def login_for_access_token(
+    session: AsyncDBSession, form_data: OAuth2PasswordRequestForm = Depends()
 ):
     """
     OAuth2 compatible token login, get an access token for future requests
+    True async implementation with AsyncSession for maximum performance
     """
     user_svc = UserService(session)
-    user = user_svc.get_user_by_email(form_data.username)
+    user = await user_svc.get_user_by_email(form_data.username)
     
     if not user or not verify_password(form_data.password, user.hashed_password):
         raise HTTPException(
@@ -53,8 +54,9 @@ def login_for_access_token(
     refresh_token = create_refresh_token(subject=str(user.id))
     
     # Store refresh token in database
-    user_svc.create_refresh_token(user.id, refresh_token)
+    await user_svc.create_refresh_token(user.id, refresh_token)
     
+    logger.info(f"User logged in successfully: {user.email}")
     return {
         "access_token": access_token, 
         "refresh_token": refresh_token,

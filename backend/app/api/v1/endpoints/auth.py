@@ -148,14 +148,15 @@ async def logout(session: AsyncDBSession, refresh_token: str = Body(..., embed=T
 
 
 @router.post("/register", response_model=UserRead, status_code=status.HTTP_201_CREATED)
-def register_new_user(user_in: UserCreate, session: DBSession):
+async def register_new_user(user_in: UserCreate, session: AsyncDBSession):
     """
     Create new user
+    True async implementation with AsyncSession for maximum performance
     """
     user_svc = UserService(session)
     
     # Check if user already exists
-    existing_user = user_svc.get_user_by_email(user_in.email)
+    existing_user = await user_svc.get_user_by_email(user_in.email)
     if existing_user:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -167,13 +168,14 @@ def register_new_user(user_in: UserCreate, session: DBSession):
         logger.info(f"Creating superuser account for email: {user_in.email}")
     
     # Create new user through service layer
-    new_user = user_svc.create_user(user_in)
+    new_user = await user_svc.create_user(user_in)
     if not new_user:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Failed to create user"
         )
     
+    logger.info(f"New user registered successfully: {new_user.email}")
     return new_user
 
 
@@ -181,10 +183,11 @@ def register_new_user(user_in: UserCreate, session: DBSession):
 async def forgot_password(
     request: ForgotPasswordRequest,
     background_tasks: BackgroundTasks,
-    session: DBSession
+    session: AsyncDBSession
 ):
     """
     Request password reset - sends email with reset token
+    True async implementation with AsyncSession for maximum performance
     
     Security considerations:
     - Always returns success message (don't reveal if email exists)
@@ -197,7 +200,7 @@ async def forgot_password(
         email = request.email.lower().strip()
         
         # Try to create a reset token (returns None if user doesn't exist)
-        reset_token = user_svc.create_password_reset_token(email)
+        reset_token = await user_svc.create_password_reset_token(email)
         
         if reset_token:
             # Send email in background
@@ -226,10 +229,11 @@ async def forgot_password(
 @router.post("/reset-password", response_model=ResetPasswordResponse)
 async def reset_password(
     request: ResetPasswordRequest,
-    session: DBSession
+    session: AsyncDBSession
 ):
     """
     Reset password using token from email
+    True async implementation with AsyncSession for maximum performance
     
     Security considerations:
     - Token is single-use and expires
@@ -249,23 +253,21 @@ async def reset_password(
             )
         
         # Verify and use the reset token
-        success = user_svc.verify_and_use_reset_token(token, new_password)
+        success = await user_svc.verify_and_use_reset_token(token, new_password)
         
         if not success:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Invalid or expired reset token. Please request a new password reset."
+                detail="Invalid or expired reset token"
             )
         
-        logger.info("Password successfully reset")
-        
+        logger.info("Password reset successful")
         return ResetPasswordResponse(
-            message="Password has been successfully reset. You can now sign in with your new password."
+            message="Password reset successful. You can now login with your new password."
         )
         
-    except HTTPException:
-        # Re-raise HTTP exceptions
-        raise
+    except HTTPException as e:
+        raise e
     except Exception as e:
         logger.error(f"Error in reset_password: {str(e)}")
         raise HTTPException(

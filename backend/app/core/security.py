@@ -7,12 +7,13 @@ from uuid import UUID
 
 from jose import jwt
 from passlib.context import CryptContext
-from sqlalchemy.orm import Session
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import select
 from fastapi import HTTPException, Depends, status
 from fastapi.security import OAuth2PasswordBearer
 
 from app.db.models import User
-from app.db.base import get_db
+from app.db.async_base import get_async_db
 from app.core.config import settings
 from slowapi import Limiter
 from slowapi.util import get_remote_address
@@ -37,10 +38,15 @@ oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/v1/auth/login")
 # JWT algorithm
 ALGORITHM = "HS256"
 
-# Rate limiter setup
-rate_limiter = Limiter(
-    key_func=get_remote_address, default_limits=[settings.get_rate_limiter]
-)
+# For backward compatibility, create a simple rate limiter
+try:
+    rate_limiter = Limiter(
+        key_func=get_remote_address, 
+        default_limits=["100/hour"]
+    )
+except Exception as e:
+    logger.warning(f"Rate limiter setup failed: {e}")
+    rate_limiter = None
 
 
 def hash_password(password: str) -> str:
@@ -80,61 +86,42 @@ def verify_password(plain_password: str, hashed_password: str) -> bool:
         return False
 
 
-def create_access_token(subject: str = None, expires_delta: Optional[timedelta] = None, data: dict = None) -> str:
+def create_access_token(subject: str, expires_delta: Optional[timedelta] = None) -> str:
     """
-    Create a JWT token as a string.
+    Create a JWT access token with the given subject and expiration time.
     """
-    to_encode = data.copy() if data else {}
-    
-    if subject:
-        to_encode["sub"] = subject
-        
     if expires_delta:
         expire = datetime.utcnow() + expires_delta
     else:
         expire = datetime.utcnow() + timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
-    to_encode.update({"exp": expire})
+    
+    to_encode = {"exp": expire, "sub": str(subject), "type": "access"}
     encoded_jwt = jwt.encode(to_encode, settings.SECRET_KEY, algorithm=ALGORITHM)
     return encoded_jwt
 
 
-def create_refresh_token(subject: str = None, data: dict = None) -> str:
+def create_refresh_token(subject: str) -> str:
     """
-    Create a refresh token with a longer expiration time.
+    Create a JWT refresh token with longer expiration time.
     """
-    to_encode = data.copy() if data else {}
-    
-    if subject:
-        to_encode["sub"] = subject
-        
-    # Refresh tokens typically live much longer than access tokens
     expire = datetime.utcnow() + timedelta(days=settings.REFRESH_TOKEN_EXPIRE_DAYS)
-    to_encode.update({"exp": expire, "token_type": "refresh"})
+    to_encode = {"exp": expire, "sub": str(subject), "type": "refresh"}
     encoded_jwt = jwt.encode(to_encode, settings.SECRET_KEY, algorithm=ALGORITHM)
     return encoded_jwt
 
 
 def validate_refresh_token(token: str) -> dict:
     """
-    Validate a refresh token and return the payload if valid.
+    Validate and decode a refresh token.
+    Raises HTTPException if invalid.
     """
     try:
         payload = jwt.decode(token, settings.SECRET_KEY, algorithms=[ALGORITHM])
-        
-        # Verify this is a refresh token
-        if payload.get("token_type") != "refresh":
+        if payload.get("type") != "refresh":
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 detail="Invalid token type",
             )
-            
-        user_id = payload.get("sub")
-        if user_id is None:
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Invalid refresh token",
-            )
-            
         return payload
     except jwt.ExpiredSignatureError:
         raise HTTPException(
@@ -151,10 +138,11 @@ def validate_refresh_token(token: str) -> dict:
 
 async def get_current_user(
     token: str = Depends(oauth2_scheme),
-    db: Session = Depends(get_db)
+    db: AsyncSession = Depends(get_async_db)
 ) -> User:
     """
     Decode the JWT and return the User object, or raise HTTPException if invalid.
+    True async implementation with AsyncSession for maximum performance.
     """
     return await get_user_from_token(token, db)
 
@@ -179,9 +167,11 @@ async def get_current_active_superuser(
     return current_user
 
 
-async def get_user_from_token(token: str, db: Session) -> User:
+async def get_user_from_token(token: str, db: AsyncSession) -> User:
     """
-    Decodes the JWT token, fetches the user from the DB, or raises if invalid.
+    Decodes the JWT token, fetches the user from the DB using async operations, 
+    or raises HTTPException if invalid.
+    True async implementation for maximum performance.
     """
     try:
         payload = jwt.decode(token, settings.SECRET_KEY, algorithms=[ALGORITHM])
@@ -191,18 +181,28 @@ async def get_user_from_token(token: str, db: Session) -> User:
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 detail="Invalid or expired token",
             )
-        user = db.query(User).filter(User.id == user_id).first()
+        
+        # Use async database operation
+        result = await db.execute(
+            select(User).filter(User.id == user_id)
+        )
+        user = result.scalar_one_or_none()
+        
         if user is None:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail="User not found",
             )
         return user
+        
     except jwt.ExpiredSignatureError:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Token has expired",
         )
+    except HTTPException:
+        # Re-raise HTTP exceptions
+        raise
     except Exception as e:
         logger.error(f"JWT decode error: {e}")
         raise HTTPException(

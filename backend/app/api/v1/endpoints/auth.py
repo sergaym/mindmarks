@@ -15,21 +15,22 @@ from app.services.user_service import UserService
 from app.services.email_service import email_service
 from app.core.config import settings
 from app.core.security import create_access_token, verify_password, create_refresh_token, validate_refresh_token
-from app.db.base import DBSession
+from app.db.async_base import AsyncDBSession
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
 
 
 @router.post("/login", response_model=Token)
-def login_for_access_token(
-    session: DBSession, form_data: OAuth2PasswordRequestForm = Depends()
+async def login_for_access_token(
+    session: AsyncDBSession, form_data: OAuth2PasswordRequestForm = Depends()
 ):
     """
     OAuth2 compatible token login, get an access token for future requests
+    True async implementation with AsyncSession for maximum performance
     """
     user_svc = UserService(session)
-    user = user_svc.get_user_by_email(form_data.username)
+    user = await user_svc.get_user_by_email(form_data.username)
     
     if not user or not verify_password(form_data.password, user.hashed_password):
         raise HTTPException(
@@ -53,8 +54,9 @@ def login_for_access_token(
     refresh_token = create_refresh_token(subject=str(user.id))
     
     # Store refresh token in database
-    user_svc.create_refresh_token(user.id, refresh_token)
+    await user_svc.create_refresh_token(user.id, refresh_token)
     
+    logger.info(f"User logged in successfully: {user.email}")
     return {
         "access_token": access_token, 
         "refresh_token": refresh_token,
@@ -63,11 +65,12 @@ def login_for_access_token(
 
 
 @router.post("/refresh", response_model=Token)
-def refresh_access_token(
-    session: DBSession, refresh_token: str = Body(..., embed=True)
+async def refresh_access_token(
+    session: AsyncDBSession, refresh_token: str = Body(..., embed=True)
 ):
     """
     Get a new access token using a refresh token
+    True async implementation with AsyncSession for maximum performance
     """
     user_svc = UserService(session)
     
@@ -77,7 +80,7 @@ def refresh_access_token(
         user_id = payload.get("sub")
         
         # Verify token exists in database and is not revoked
-        db_token = user_svc.get_refresh_token(refresh_token)
+        db_token = await user_svc.get_refresh_token(refresh_token)
         if not db_token:
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
@@ -85,7 +88,7 @@ def refresh_access_token(
             )
         
         # Verify user exists and is active
-        user = user_svc.get_user_by_id(user_id)
+        user = await user_svc.get_user_by_id(user_id)
         if not user or not user.is_active:
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
@@ -93,7 +96,7 @@ def refresh_access_token(
             )
         
         # Revoke the used refresh token (token rotation)
-        user_svc.revoke_refresh_token(refresh_token)
+        await user_svc.revoke_refresh_token(refresh_token)
         
         # Generate new access token
         access_token_expires = timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
@@ -105,8 +108,9 @@ def refresh_access_token(
         new_refresh_token = create_refresh_token(subject=str(user.id))
         
         # Store new refresh token in database
-        user_svc.create_refresh_token(user.id, new_refresh_token)
+        await user_svc.create_refresh_token(user.id, new_refresh_token)
         
+        logger.info(f"Token refreshed successfully for user: {user.email}")
         return {
             "access_token": access_token,
             "refresh_token": new_refresh_token,
@@ -125,31 +129,34 @@ def refresh_access_token(
 
 
 @router.post("/logout", status_code=status.HTTP_200_OK)
-def logout(session: DBSession, refresh_token: str = Body(..., embed=True)):
+async def logout(session: AsyncDBSession, refresh_token: str = Body(..., embed=True)):
     """
     Logout a user by revoking their refresh token
+    True async implementation with AsyncSession for maximum performance
     """
     user_svc = UserService(session)
     
     # Revoke the refresh token
-    revoked = user_svc.revoke_refresh_token(refresh_token)
+    revoked = await user_svc.revoke_refresh_token(refresh_token)
     if not revoked:
         # We don't want to give hints about valid/invalid tokens
         # So just return success regardless
         pass
     
+    logger.info("User logged out successfully")
     return {"message": "Successfully logged out"}
 
 
 @router.post("/register", response_model=UserRead, status_code=status.HTTP_201_CREATED)
-def register_new_user(user_in: UserCreate, session: DBSession):
+async def register_new_user(user_in: UserCreate, session: AsyncDBSession):
     """
     Create new user
+    True async implementation with AsyncSession for maximum performance
     """
     user_svc = UserService(session)
     
     # Check if user already exists
-    existing_user = user_svc.get_user_by_email(user_in.email)
+    existing_user = await user_svc.get_user_by_email(user_in.email)
     if existing_user:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -161,13 +168,14 @@ def register_new_user(user_in: UserCreate, session: DBSession):
         logger.info(f"Creating superuser account for email: {user_in.email}")
     
     # Create new user through service layer
-    new_user = user_svc.create_user(user_in)
+    new_user = await user_svc.create_user(user_in)
     if not new_user:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Failed to create user"
         )
     
+    logger.info(f"New user registered successfully: {new_user.email}")
     return new_user
 
 
@@ -175,10 +183,11 @@ def register_new_user(user_in: UserCreate, session: DBSession):
 async def forgot_password(
     request: ForgotPasswordRequest,
     background_tasks: BackgroundTasks,
-    session: DBSession
+    session: AsyncDBSession
 ):
     """
     Request password reset - sends email with reset token
+    True async implementation with AsyncSession for maximum performance
     
     Security considerations:
     - Always returns success message (don't reveal if email exists)
@@ -191,7 +200,7 @@ async def forgot_password(
         email = request.email.lower().strip()
         
         # Try to create a reset token (returns None if user doesn't exist)
-        reset_token = user_svc.create_password_reset_token(email)
+        reset_token = await user_svc.create_password_reset_token(email)
         
         if reset_token:
             # Send email in background
@@ -220,10 +229,11 @@ async def forgot_password(
 @router.post("/reset-password", response_model=ResetPasswordResponse)
 async def reset_password(
     request: ResetPasswordRequest,
-    session: DBSession
+    session: AsyncDBSession
 ):
     """
     Reset password using token from email
+    True async implementation with AsyncSession for maximum performance
     
     Security considerations:
     - Token is single-use and expires
@@ -243,23 +253,21 @@ async def reset_password(
             )
         
         # Verify and use the reset token
-        success = user_svc.verify_and_use_reset_token(token, new_password)
+        success = await user_svc.verify_and_use_reset_token(token, new_password)
         
         if not success:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Invalid or expired reset token. Please request a new password reset."
+                detail="Invalid or expired reset token"
             )
         
-        logger.info("Password successfully reset")
-        
+        logger.info("Password reset successful")
         return ResetPasswordResponse(
-            message="Password has been successfully reset. You can now sign in with your new password."
+            message="Password reset successful. You can now login with your new password."
         )
         
-    except HTTPException:
-        # Re-raise HTTP exceptions
-        raise
+    except HTTPException as e:
+        raise e
     except Exception as e:
         logger.error(f"Error in reset_password: {str(e)}")
         raise HTTPException(
@@ -269,21 +277,58 @@ async def reset_password(
 
 
 @router.delete("/cleanup-expired-tokens")
-async def cleanup_expired_tokens(session: DBSession):
+async def cleanup_expired_tokens(session: AsyncDBSession):
     """
-    Cleanup expired password reset tokens
-    Should be called periodically via cron job or maintenance tasks
+    Admin endpoint to cleanup expired tokens
+    True async implementation with AsyncSession for maximum performance
+    This should typically be called via a scheduled job
     """
     try:
         user_svc = UserService(session)
-        deleted_count = user_svc.cleanup_expired_reset_tokens()
         
-        logger.info(f"Cleaned up {deleted_count} expired password reset tokens")
-        return {"message": f"Cleaned up {deleted_count} expired tokens"}
+        # Cleanup expired refresh tokens
+        refresh_count = await user_svc.cleanup_expired_refresh_tokens()
+        
+        # Cleanup expired reset tokens
+        reset_count = await user_svc.cleanup_expired_reset_tokens()
+        
+        logger.info(f"Token cleanup completed: {refresh_count} refresh, {reset_count} reset tokens removed")
+        return {
+            "message": "Token cleanup completed successfully",
+            "expired_refresh_tokens_removed": refresh_count,
+            "expired_reset_tokens_removed": reset_count
+        }
         
     except Exception as e:
-        logger.error(f"Error cleaning up expired tokens: {str(e)}")
+        logger.error(f"Error in cleanup_expired_tokens: {str(e)}")
         raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, 
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Failed to cleanup expired tokens"
+        )
+
+
+@router.get("/health")
+async def auth_health_check(session: AsyncDBSession):
+    """
+    Health check endpoint for authentication service
+    Tests async database connectivity and basic operations
+    """
+    try:
+        user_svc = UserService(session)
+        
+        # Test basic database connectivity
+        users = await user_svc.get_users(limit=1)
+        
+        return {
+            "status": "healthy",
+            "database": "connected",
+            "async_operations": "functional",
+            "timestamp": logger.info("Auth health check passed")
+        }
+        
+    except Exception as e:
+        logger.error(f"Auth health check failed: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Authentication service unhealthy"
         ) 

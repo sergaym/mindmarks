@@ -75,8 +75,8 @@ async def get_user_content(
 
 
 @router.get("/me", response_model=List[ContentListItem])
-def get_my_content(
-    db: DBSession,
+async def get_my_content(
+    db: AsyncSession = Depends(get_async_db),
     query: Optional[str] = Query(None, description="Search query"),
     types: Optional[List[str]] = Query(None, description="Filter by content types"),
     statuses: Optional[List[str]] = Query(None, description="Filter by statuses"),
@@ -109,7 +109,7 @@ def get_my_content(
         
         if priorities:
             from app.api.v1.schemas.content import ContentPriority
-            priority_enums = [ContentPriority(p) for p in priorities if p in [e.value for e in ContentPriority]]
+            priority_enums = [ContentPriority(p) for p in priorities if p in [e.value for p in ContentPriority]]
         
         filters = ContentSearchFilters(
             query=query,
@@ -121,21 +121,21 @@ def get_my_content(
             limit=limit
         )
     
-    content_list = content_svc.get_user_content(UUID(current_user.id), filters)
+    content_list = await content_svc.get_user_content(UUID(current_user.id), filters)
     return [ContentService.content_to_list_item(content) for content in content_list]
 
 
 @router.post("", response_model=ContentResponse)
-def create_content(
+async def create_content(
     content_in: ContentCreate,
-    db: DBSession,
+    db: AsyncSession = Depends(get_async_db),
     current_user: User = Depends(get_current_user),
 ):
     """
     Create new content
     """
     content_svc = ContentService(db)
-    content = content_svc.create_content(content_in, UUID(current_user.id))
+    content = await content_svc.create_content(content_in, UUID(current_user.id))
     
     if not content:
         raise HTTPException(
@@ -155,16 +155,16 @@ def create_content(
 
 
 @router.get("/{content_id}", response_model=ContentRead)
-def get_content_by_id(
+async def get_content_by_id(
     content_id: UUID,
-    db: DBSession,
+    db: AsyncSession = Depends(get_async_db),
     current_user: User = Depends(get_current_user),
 ):
     """
     Get content by ID
     """
     content_svc = ContentService(db)
-    content = content_svc.get_content_by_id(content_id, UUID(current_user.id))
+    content = await content_svc.get_content_by_id(content_id, UUID(current_user.id))
     
     if not content:
         raise HTTPException(
@@ -176,17 +176,17 @@ def get_content_by_id(
 
 
 @router.patch("/{content_id}", response_model=ContentRead)
-def update_content(
+async def update_content(
     content_id: UUID,
     content_in: ContentUpdate,
-    db: DBSession,
+    db: AsyncSession = Depends(get_async_db),
     current_user: User = Depends(get_current_user),
 ):
     """
     Update content
     """
     content_svc = ContentService(db)
-    content = content_svc.update_content(content_id, content_in, UUID(current_user.id))
+    content = await content_svc.update_content(content_id, content_in, UUID(current_user.id))
     
     if not content:
         raise HTTPException(
@@ -198,16 +198,16 @@ def update_content(
 
 
 @router.delete("/{content_id}")
-def delete_content(
+async def delete_content(
     content_id: UUID,
-    db: DBSession,
+    db: AsyncSession = Depends(get_async_db),
     current_user: User = Depends(get_current_user),
 ):
     """
     Delete content (owner only)
     """
     content_svc = ContentService(db)
-    success = content_svc.delete_content(content_id, UUID(current_user.id))
+    success = await content_svc.delete_content(content_id, UUID(current_user.id))
     
     if not success:
         raise HTTPException(
@@ -219,13 +219,13 @@ def delete_content(
 
 
 @router.get("/stats/me", response_model=ContentStats)
-def get_my_content_stats(
-    db: DBSession,
+async def get_my_content_stats(
+    db: AsyncSession = Depends(get_async_db),
     current_user: User = Depends(get_current_user),
 ):
     """
     Get content statistics for current user
     """
     content_svc = ContentService(db)
-    return content_svc.get_content_stats(UUID(current_user.id))
+    return await content_svc.get_content_stats(UUID(current_user.id))
 

@@ -43,13 +43,6 @@ class UserService:
             logger.error(f"Error getting user by email {email}: {e}")
             return None
 
-    async def authenticate_user(self, email: str, password: str) -> Optional[User]:
-        """Authenticate a user by email and password - True async"""
-        user = await self.get_user_by_email(email)
-        if not user or not verify_password(password, user.hashed_password):
-            return None
-        return user
-
     async def create_user(self, user_in: UserCreate) -> Optional[User]:
         """Create a new user - True async operation"""
         try:
@@ -146,41 +139,209 @@ class UserService:
             logger.error(f"Failed to delete user {user_id}: {e}")
             return False
 
+    async def get_users(self, skip: int = 0, limit: int = 100) -> List[User]:
+        """Get all users with pagination - True async operation"""
+        try:
+            result = await self.db.execute(
+                select(User).offset(skip).limit(limit)
+            )
+            return result.scalars().all()
+        except Exception as e:
+            logger.error(f"Error getting users: {e}")
+            return []
+        
+    async def create_refresh_token(self, user_id: UUID, token: str) -> Optional[RefreshToken]:
+        """Store a refresh token in the database - True async operation"""
+        try:
+            # Calculate expiration date
+            expires_at = datetime.utcnow() + timedelta(days=settings.REFRESH_TOKEN_EXPIRE_DAYS)
+            
+            # Create token record
+            refresh_token = RefreshToken(
+                id=str(uuid.uuid4()),
+                token=token,
+                user_id=str(user_id),
+                expires_at=expires_at
+            )
+            
+            # Save to database
+            self.db.add(refresh_token)
+            await self.db.commit()
+            await self.db.refresh(refresh_token)
+            
+            return refresh_token
+            
+        except Exception as e:
+            await self.db.rollback()
+            logger.error(f"Error creating refresh token: {e}")
+            return None
+    
+    async def get_refresh_token(self, token: str) -> Optional[RefreshToken]:
+        """Get a refresh token by its token string - True async operation"""
+        try:
+            result = await self.db.execute(
+                select(RefreshToken).filter(
+                    RefreshToken.token == token,
+                    RefreshToken.revoked == False,
+                    RefreshToken.expires_at > datetime.utcnow()
+                )
+            )
+            return result.scalar_one_or_none()
+        except Exception as e:
+            logger.error(f"Error getting refresh token: {e}")
+            return None
+    
+    async def revoke_refresh_token(self, token: str) -> bool:
+        """Revoke a refresh token - True async operation"""
+        try:
+            result = await self.db.execute(
+                update(RefreshToken)
+                .filter(RefreshToken.token == token)
+                .values(revoked=True)
+            )
+            await self.db.commit()
+            return result.rowcount > 0
+        except Exception as e:
+            await self.db.rollback()
+            logger.error(f"Error revoking refresh token: {e}")
+            return False
+    
+    async def revoke_all_user_refresh_tokens(self, user_id: UUID) -> int:
+        """Revoke all refresh tokens for a user - True async operation"""
+        try:
+            result = await self.db.execute(
+                update(RefreshToken)
+                .filter(
+                    RefreshToken.user_id == str(user_id),
+                    RefreshToken.revoked == False
+                )
+                .values(revoked=True)
+            )
+            await self.db.commit()
+            revoked_count = result.rowcount
+            logger.info(f"Revoked {revoked_count} refresh tokens for user {user_id}")
+            return revoked_count
+        except Exception as e:
+            await self.db.rollback()
+            logger.error(f"Error revoking user refresh tokens: {e}")
+            return 0
 
-    @staticmethod
-    def is_active_user(user: User) -> bool:
-        """Check if user is active"""
-        return user.is_active
+    async def cleanup_expired_refresh_tokens(self) -> int:
+        """Clean up expired refresh tokens - True async operation"""
+        try:
+            result = await self.db.execute(
+                delete(RefreshToken).filter(
+                    RefreshToken.expires_at <= datetime.utcnow()
+                )
+            )
+            await self.db.commit()
+            deleted_count = result.rowcount
+            logger.info(f"Cleaned up {deleted_count} expired refresh tokens")
+            return deleted_count
+            
+        except Exception as e:
+            await self.db.rollback()
+            logger.error(f"Failed to cleanup expired refresh tokens: {e}")
+            return 0
 
-    @staticmethod
-    def is_superuser(user: User) -> bool:
-        """Check if user is superuser"""
-        return user.is_superuser
+    async def create_password_reset_token(self, email: str) -> Optional[str]:
+        """Create a password reset token for a user - True async operation"""
+        try:
+            user = await self.get_user_by_email(email)
+            if not user:
+                return None
+            
+            # Invalidate any existing tokens for this user
+            await self.db.execute(
+                update(PasswordResetToken)
+                .filter(
+                    and_(
+                        PasswordResetToken.user_email == email.lower(),
+                        PasswordResetToken.used == False,
+                        PasswordResetToken.expires_at > datetime.utcnow()
+                    )
+                )
+                .values(used=True)
+            )
+            
+            # Create new reset token
+            reset_record, reset_token = PasswordResetToken.create_token(email.lower())
+            self.db.add(reset_record)
+            await self.db.commit()
+            
+            logger.info(f"Password reset token created for user: {email}")
+            return reset_token
+            
+        except Exception as e:
+            await self.db.rollback()
+            logger.error(f"Error creating password reset token: {e}")
+            return None
+    
+    async def verify_and_use_reset_token(self, token: str, new_password: str) -> bool:
+        """Verify and use a password reset token - True async operation"""
+        try:
+            # Find valid reset token
+            result = await self.db.execute(
+                select(PasswordResetToken).filter(
+                    and_(
+                        PasswordResetToken.used == False,
+                        PasswordResetToken.expires_at > datetime.utcnow()
+                    )
+                )
+            )
+            reset_record = result.scalar_one_or_none()
+            
+            if not reset_record:
+                logger.warning("Invalid or expired reset token attempted")
+                return False
+            
+            # Verify token
+            if not reset_record.verify_token(token):
+                logger.warning("Invalid reset token verification failed")
+                return False
+            
+            # Find and update user password
+            user = await self.get_user_by_email(reset_record.user_email)
+            if not user:
+                logger.error(f"User not found for email: {reset_record.user_email}")
+                return False
+            
+            # Update password
+            user.hashed_password = get_password_hash(new_password)
+            user.updated_at = datetime.utcnow()
+            
+            # Mark token as used
+            reset_record.used = True
+            
+            # Revoke all refresh tokens for security
+            await self.revoke_all_user_refresh_tokens(UUID(user.id))
+            
+            await self.db.commit()
+            logger.info(f"Password reset successful for user: {user.email}")
+            return True
+            
+        except Exception as e:
+            await self.db.rollback()
+            logger.error(f"Failed to reset password: {e}")
+            return False
 
-# For backwards compatibility
-def get_user_by_id(db: Session, user_id: UUID) -> Optional[User]:
-    return UserService(db).get_user_by_id(user_id)
-
-def get_user_by_email(db: Session, email: str) -> Optional[User]:
-    return UserService(db).get_user_by_email(email)
-
-def authenticate_user(db: Session, email: str, password: str) -> Optional[User]:
-    return UserService(db).authenticate_user(email, password)
-
-def create_user(db: Session, user_in: UserCreate) -> User:
-    return UserService(db).create_user(user_in)
-
-def update_user(db: Session, user_id: UUID, user_in: Union[UserUpdate, Dict]) -> Optional[User]:
-    return UserService(db).update_user(user_id, user_in)
-
-def get_users(db: Session, skip: int = 0, limit: int = 100) -> List[User]:
-    return UserService(db).get_users(skip, limit)
-
-def search_users(db: Session, query: str, skip: int = 0, limit: int = 100) -> List[User]:
-    return UserService(db).search_users(query, skip, limit)
-
-def is_active_user(user: User) -> bool:
-    return UserService.is_active_user(user)
-
-def is_superuser(user: User) -> bool:
-    return UserService.is_superuser(user) 
+    async def cleanup_expired_reset_tokens(self) -> int:
+        """Clean up expired password reset tokens - True async operation"""
+        try:
+            result = await self.db.execute(
+                delete(PasswordResetToken).filter(
+                    or_(
+                        PasswordResetToken.expires_at <= datetime.utcnow(),
+                        PasswordResetToken.used == True
+                    )
+                )
+            )
+            await self.db.commit()
+            deleted_count = result.rowcount
+            logger.info(f"Cleaned up {deleted_count} expired/used password reset tokens")
+            return deleted_count
+            
+        except Exception as e:
+            await self.db.rollback()
+            logger.error(f"Failed to cleanup expired reset tokens: {e}")
+            return 0 

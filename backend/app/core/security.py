@@ -7,12 +7,13 @@ from uuid import UUID
 
 from jose import jwt
 from passlib.context import CryptContext
-from sqlalchemy.orm import Session
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import select
 from fastapi import HTTPException, Depends, status
 from fastapi.security import OAuth2PasswordBearer
 
 from app.db.models import User
-from app.db.base import get_db
+from app.db.async_base import get_async_db
 from app.core.config import settings
 from slowapi import Limiter
 from slowapi.util import get_remote_address
@@ -37,10 +38,15 @@ oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/v1/auth/login")
 # JWT algorithm
 ALGORITHM = "HS256"
 
-# Rate limiter setup
-rate_limiter = Limiter(
-    key_func=get_remote_address, default_limits=[settings.get_rate_limiter]
-)
+# For backward compatibility, create a simple rate limiter
+try:
+    rate_limiter = Limiter(
+        key_func=get_remote_address, 
+        default_limits=["100/hour"]
+    )
+except Exception as e:
+    logger.warning(f"Rate limiter setup failed: {e}")
+    rate_limiter = None
 
 
 def hash_password(password: str) -> str:

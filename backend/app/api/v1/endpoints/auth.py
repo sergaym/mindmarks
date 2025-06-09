@@ -65,11 +65,12 @@ async def login_for_access_token(
 
 
 @router.post("/refresh", response_model=Token)
-def refresh_access_token(
-    session: DBSession, refresh_token: str = Body(..., embed=True)
+async def refresh_access_token(
+    session: AsyncDBSession, refresh_token: str = Body(..., embed=True)
 ):
     """
     Get a new access token using a refresh token
+    True async implementation with AsyncSession for maximum performance
     """
     user_svc = UserService(session)
     
@@ -79,7 +80,7 @@ def refresh_access_token(
         user_id = payload.get("sub")
         
         # Verify token exists in database and is not revoked
-        db_token = user_svc.get_refresh_token(refresh_token)
+        db_token = await user_svc.get_refresh_token(refresh_token)
         if not db_token:
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
@@ -87,7 +88,7 @@ def refresh_access_token(
             )
         
         # Verify user exists and is active
-        user = user_svc.get_user_by_id(user_id)
+        user = await user_svc.get_user_by_id(user_id)
         if not user or not user.is_active:
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
@@ -95,7 +96,7 @@ def refresh_access_token(
             )
         
         # Revoke the used refresh token (token rotation)
-        user_svc.revoke_refresh_token(refresh_token)
+        await user_svc.revoke_refresh_token(refresh_token)
         
         # Generate new access token
         access_token_expires = timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
@@ -107,8 +108,9 @@ def refresh_access_token(
         new_refresh_token = create_refresh_token(subject=str(user.id))
         
         # Store new refresh token in database
-        user_svc.create_refresh_token(user.id, new_refresh_token)
+        await user_svc.create_refresh_token(user.id, new_refresh_token)
         
+        logger.info(f"Token refreshed successfully for user: {user.email}")
         return {
             "access_token": access_token,
             "refresh_token": new_refresh_token,
@@ -127,19 +129,21 @@ def refresh_access_token(
 
 
 @router.post("/logout", status_code=status.HTTP_200_OK)
-def logout(session: DBSession, refresh_token: str = Body(..., embed=True)):
+async def logout(session: AsyncDBSession, refresh_token: str = Body(..., embed=True)):
     """
     Logout a user by revoking their refresh token
+    True async implementation with AsyncSession for maximum performance
     """
     user_svc = UserService(session)
     
     # Revoke the refresh token
-    revoked = user_svc.revoke_refresh_token(refresh_token)
+    revoked = await user_svc.revoke_refresh_token(refresh_token)
     if not revoked:
         # We don't want to give hints about valid/invalid tokens
         # So just return success regardless
         pass
     
+    logger.info("User logged out successfully")
     return {"message": "Successfully logged out"}
 
 

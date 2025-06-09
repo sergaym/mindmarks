@@ -68,31 +68,33 @@ async def update_user_me(
 
 
 @router.get("", response_model=List[UserRead])
-def read_users(
-    db: DBSession,
+async def read_users(
+    db: AsyncDBSession,
     skip: int = 0,
     limit: int = 100,
     current_user: User = Depends(get_current_active_superuser),
 ):
     """
     Retrieve all users - superuser only
+    True async implementation with AsyncSession for maximum performance
     """
     user_svc = UserService(db)
-    users = user_svc.get_users(skip, limit)
+    users = await user_svc.get_users(skip, limit)
     return [UserRead.from_orm(user) for user in users]
 
 
 @router.get("/{user_id}", response_model=UserRead)
-def read_user_by_id(
+async def read_user_by_id(
     user_id: UUID,
-    db: DBSession,
+    db: AsyncDBSession,
     current_user: User = Depends(get_current_active_superuser),
 ):
     """
     Get a specific user by id - superuser only
+    True async implementation with AsyncSession for maximum performance
     """
     user_svc = UserService(db)
-    user = user_svc.get_user_by_id(user_id)
+    user = await user_svc.get_user_by_id(user_id)
     
     if not user:
         raise HTTPException(

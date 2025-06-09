@@ -8,16 +8,17 @@ from app.api.v1.schemas.content import (
     ContentSearchFilters, ContentStats, ContentCollaboratorCreate, ContentCollaboratorUpdate
 )
 from app.services.content_service import ContentService
-from app.db.base import DBSession
+from app.db.async_base import get_async_db
 from app.db.models import User
+from sqlalchemy.ext.asyncio import AsyncSession
 
 router = APIRouter()
 
 
 @router.get("/user/{user_id}", response_model=List[ContentListItem])
-def get_user_content(
+async def get_user_content(
     user_id: UUID,
-    db: DBSession,
+    db: AsyncSession = Depends(get_async_db),
     query: Optional[str] = Query(None, description="Search query"),
     types: Optional[List[str]] = Query(None, description="Filter by content types"),
     statuses: Optional[List[str]] = Query(None, description="Filter by statuses"),
@@ -69,7 +70,7 @@ def get_user_content(
             limit=limit
         )
     
-    content_list = content_svc.get_user_content(user_id, filters)
+    content_list = await content_svc.get_user_content(user_id, filters)
     return [ContentService.content_to_list_item(content) for content in content_list]
 
 

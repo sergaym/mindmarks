@@ -59,11 +59,11 @@ export function useContent() {
 
   // Background refresh function
   const refreshContentInBackground = useCallback(async () => {
+    const user = getCurrentUser();
+    if (!user) return;
+
     try {
       setIsRefreshing(true);
-      const user = await getCurrentUser();
-      if (!user) return;
-
       const contentItems = await fetchUserContent(user);
       
       // Update cache and state
@@ -72,7 +72,7 @@ export function useContent() {
       setContent(contentItems);
       setStatus('success');
     } catch (error) {
-      console.error('Background refresh failed:', error);
+      console.error('[useContent] Background refresh failed:', error);
       // Don't show error for background refresh
     } finally {
       setIsRefreshing(false);
@@ -81,6 +81,19 @@ export function useContent() {
 
   // Fetch content from backend with instant cache display
   const fetchContent = useCallback(async () => {
+    // Wait for user authentication to complete
+    if (userLoading) {
+      setStatus('loading');
+      return;
+    }
+
+    const user = getCurrentUser();
+    if (!user) {
+      setStatus('error');
+      setError('Authentication required');
+      return;
+    }
+
     // If we have fresh cache, show it immediately
     if (isCacheFresh() && persistentCache.content.length > 0) {
       setStatus('success');
@@ -95,13 +108,7 @@ export function useContent() {
     setError(null);
 
     try {
-      const user = await getCurrentUser();
-      if (!user) {
-        setStatus('error');
-        setError('Authentication required');
-        return;
-      }
-
+      console.log('[useContent] Fetching user content for user:', user.id);
       const contentItems = await fetchUserContent(user);
       
       // Update cache and state
@@ -109,8 +116,9 @@ export function useContent() {
       persistentCache.lastFetch = Date.now();
       setContent(contentItems);
       setStatus('success');
+      console.log('[useContent] Successfully fetched', contentItems.length, 'content items');
     } catch (error) {
-      console.error('Error fetching content:', error);
+      console.error('[useContent] Error fetching content:', error);
       
       if (error instanceof ContentApiError) {
         if (error.status === 401) {
@@ -125,19 +133,23 @@ export function useContent() {
       }
       setStatus('error');
     }
-  }, [getCurrentUser, isCacheFresh]);
+  }, [getCurrentUser, isCacheFresh, userLoading]);
 
-  // Load content on mount and when user changes
+  // Load content when user authentication is ready
   useEffect(() => {
-    fetchContent();
-  }, [fetchContent]);
+    if (!userLoading) {
+      console.log('[useContent] User loading completed, fetching content...');
+      fetchContent();
+    }
+  }, [fetchContent, userLoading]);
 
   // Background refresh when cache is stale
   useEffect(() => {
-    if (!isCacheFresh() && status === 'success') {
+    if (!isCacheFresh() && status === 'success' && !userLoading) {
+      console.log('[useContent] Cache is stale, refreshing in background...');
       refreshContentInBackground();
     }
-  }, [isCacheFresh, status, refreshContentInBackground]);
+  }, [isCacheFresh, status, refreshContentInBackground, userLoading]);
 
   // Add new content item with optimistic updates
   const addContent = useCallback(async (newItem: {
@@ -151,15 +163,15 @@ export function useContent() {
     tags?: string[];
     url?: string;
   }): Promise<{ status: 'success' | 'error'; data?: ContentItem[]; id?: string; error?: string }> => {
-    try {
-      const user = await getCurrentUser();
-      if (!user) {
-        return { 
-          status: 'error', 
-          error: 'Authentication required' 
-        };
-      }
+    const user = getCurrentUser();
+    if (!user) {
+      return { 
+        status: 'error', 
+        error: 'Authentication required' 
+      };
+    }
 
+    try {
       // Create optimistic item for instant UI feedback
       const optimisticId = `temp-${Date.now()}`;
       const optimisticItem: ContentItem = {
@@ -182,7 +194,7 @@ export function useContent() {
       setContent(optimisticContent);
       persistentCache.content = optimisticContent;
 
-      // For now, create with predefined template content
+      // Create request for backend
       const createRequest: CreateContentRequest = {
         title: newItem.name,
         type: newItem.type,
@@ -190,10 +202,11 @@ export function useContent() {
         description: newItem.description,
         tags: newItem.tags,
         status: newItem.column === 'planned' ? 'planned' : 
-                newItem.column === 'done' ? 'completed' : 'in-progress',
+                newItem.column === 'done' ? 'completed' : 'in_progress',
         priority: 'medium'
       };
 
+      console.log('[useContent] Creating new content:', createRequest);
       const result = await createContent(createRequest, user);
       
       // Replace optimistic item with real one
@@ -206,13 +219,14 @@ export function useContent() {
       // Cache the content page
       persistentCache.pages.set(result.id, result.contentPage);
       
+      console.log('[useContent] Successfully created content with ID:', result.id);
       return { 
         status: 'success', 
         data: finalContent, 
         id: result.id 
       };
     } catch (error) {
-      console.error('Error adding content:', error);
+      console.error('[useContent] Error adding content:', error);
       
       // Revert optimistic update on error
       setContent(content);

@@ -6,8 +6,7 @@
 
 import type { 
   ContentItem, 
-  ContentPage, 
-  User
+  ContentPage
 } from '@/types/content';
 import type {
   CreateContentRequest,
@@ -24,11 +23,11 @@ import {
 
 export class ContentService {
   /**
-   * Fetch all content for a user
+   * Fetch all content for authenticated user
    */
-  static async getUserContent(user: User): Promise<ContentItem[]> {
+  static async getUserContent(): Promise<ContentItem[]> {
     try {
-      return await apiFetchUserContent(user);
+      return await apiFetchUserContent();
     } catch (error) {
       console.error('[ContentService] Failed to fetch user content:', error);
       throw error;
@@ -39,11 +38,10 @@ export class ContentService {
    * Create new content
    */
   static async createContent(
-    request: CreateContentRequest,
-    user: User
+    request: CreateContentRequest
   ) {
     try {
-      return await apiCreateContent(request, user);
+      return await apiCreateContent(request);
     } catch (error) {
       console.error('[ContentService] Failed to create content:', error);
       throw error;
@@ -53,9 +51,9 @@ export class ContentService {
   /**
    * Get content page by ID
    */
-  static async getContentById(id: string, user: User): Promise<ContentPage | null> {
+  static async getContentById(id: string): Promise<ContentPage | null> {
     try {
-      return await apiFetchContentById(id, user);
+      return await apiFetchContentById(id);
     } catch (error) {
       if (error instanceof ContentApiError && error.status === 404) {
         return null;
@@ -70,11 +68,10 @@ export class ContentService {
    */
   static async updateContent(
     id: string,
-    request: UpdateContentRequest,
-    user: User
+    request: UpdateContentRequest
   ): Promise<ContentPage> {
     try {
-      return await apiUpdateContent(id, request, user);
+      return await apiUpdateContent(id, request);
     } catch (error) {
       console.error('[ContentService] Failed to update content:', error);
       throw error;
@@ -84,9 +81,9 @@ export class ContentService {
   /**
    * Delete content
    */
-  static async deleteContent(id: string, user: User): Promise<void> {
+  static async deleteContent(id: string): Promise<void> {
     try {
-      return await apiDeleteContent(id, user);
+      return await apiDeleteContent(id);
     } catch (error) {
       console.error('[ContentService] Failed to delete content:', error);
       throw error;

@@ -1,17 +1,10 @@
 import { ContentItem, ContentType, User, ContentPage, EditorContent } from '@/types/content';
+import { client, ApiError } from './client';
 
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
-const API_URL = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:8000';
-
-// Error class for content API errors
-export class ContentApiError extends Error {
-  constructor(
-    public status: number,
-    public message: string,
-    public code?: string,
-    public details?: unknown
-  ) {
-    super(message);
+// Legacy alias for backward compatibility
+export class ContentApiError extends ApiError {
+  constructor(status: number, message: string, code?: string, details?: unknown) {
+    super(status, message, code, details);
     this.name = 'ContentApiError';
   }
 }
@@ -77,8 +70,8 @@ export interface BackendContentRead {
   priority: 'low' | 'medium' | 'high';
   content: Array<{
     type: string;
-    children: Array<{ [key: string]: any }>;
-    attrs?: { [key: string]: any };
+    children: Array<Record<string, unknown>>;
+    attrs?: Record<string, unknown>;
   }>;
   key_takeaways: string[];
   progress: number;
@@ -122,88 +115,6 @@ export interface CreateContentResponse {
   id: string;
   content: ContentItem;
   contentPage: ContentPage;
-}
-
-/**
- * Get authentication headers
- */
-function getAuthHeaders(): Record<string, string> {
-  if (typeof window === 'undefined') return {};
-  
-  const token = sessionStorage.getItem('access_token') || localStorage.getItem('access_token');
-  const tokenType = localStorage.getItem('token_type') || 'Bearer';
-  
-  if (!token) {
-    throw new ContentApiError(401, 'No authentication token found');
-  }
-  
-  return {
-    'Authorization': `${tokenType} ${token}`,
-    'Content-Type': 'application/json',
-  };
-}
-
-/**
- * Make API request with proper error handling
- */
-async function apiRequest<T>(endpoint: string, method: string = 'GET', data?: unknown): Promise<T> {
-  const url = `${API_URL}${endpoint}`;
-  
-  try {
-    const config: RequestInit = {
-      method,
-      headers: getAuthHeaders(),
-    };
-    
-    if (data && (method === 'POST' || method === 'PUT' || method === 'PATCH')) {
-      config.body = JSON.stringify(data);
-    }
-    
-    console.log(`[API] ${method} ${url}`, data ? { data } : '');
-    
-    const response = await fetch(url, config);
-    
-    if (!response.ok) {
-      let errorMessage = `HTTP ${response.status}: ${response.statusText}`;
-      let errorDetails: unknown;
-      
-      try {
-        const errorData = await response.json();
-        errorMessage = errorData.detail || errorData.message || errorMessage;
-        errorDetails = errorData;
-      } catch {
-        // If we can't parse error response, use the status text
-      }
-      
-      throw new ContentApiError(
-        response.status,
-        errorMessage,
-        response.status.toString(),
-        errorDetails
-      );
-    }
-    
-    // Handle 204 No Content responses
-    if (response.status === 204) {
-      return undefined as T;
-    }
-    
-    const result = await response.json();
-    console.log(`[API] ${method} ${url} - Success:`, result);
-    return result;
-  } catch (error) {
-    if (error instanceof ContentApiError) {
-      throw error;
-    }
-    
-    console.error(`[API] ${method} ${url} - Error:`, error);
-    
-    if (error instanceof TypeError && error.message.includes('fetch')) {
-      throw new ContentApiError(0, 'Network error: Unable to connect to the server');
-    }
-    
-    throw new ContentApiError(500, 'An unexpected error occurred');
-  }
 }
 
 /**
@@ -266,26 +177,6 @@ function backendContentPageToFrontend(backendPage: BackendContentRead): ContentP
     createdBy: convertUser(backendPage.created_by),
     lastEditedBy: backendPage.last_edited_by ? convertUser(backendPage.last_edited_by) : convertUser(backendPage.created_by),
     collaborators: backendPage.collaborators.map(collab => convertUser(collab.user)),
-  };
-}
-
-/**
- * Convert ContentPage to ContentItem for dashboard view
- */
-function contentPageToItem(page: ContentPage): ContentItem {
-  return {
-    id: page.id,
-    name: page.title,
-    startAt: page.createdAt,
-    endAt: undefined, // Can be enhanced based on content type
-    column: page.status,
-    owner: page.createdBy,
-    type: page.type,
-    description: page.summary,
-    tags: page.tags,
-    url: page.url,
-    progress: page.progress,
-    priority: page.priority,
   };
 }
 
@@ -391,12 +282,17 @@ function getDefaultContent(type: ContentType): EditorContent[] {
 /**
  * Fetch user's content items
  */
-export async function fetchUserContent(user: User): Promise<ContentItem[]> {
+export async function fetchUserContent(): Promise<ContentItem[]> {
   try {
-    const response = await apiRequest<BackendContentListItem[]>('/api/v1/content/me');
+    const response = await client.get<BackendContentListItem[]>('/api/v1/content/me');
     return response.map(backendContentToFrontend);
   } catch (error) {
     console.error('Error fetching user content:', error);
+    
+    // Convert to legacy ContentApiError for backward compatibility
+    if (error instanceof ApiError) {
+      throw new ContentApiError(error.status, error.message, error.code, error.details);
+    }
     throw error;
   }
 }
@@ -405,8 +301,7 @@ export async function fetchUserContent(user: User): Promise<ContentItem[]> {
  * Create new content item
  */
 export async function createContent(
-  request: CreateContentRequest,
-  user: User
+  request: CreateContentRequest
 ): Promise<CreateContentResponse> {
   try {
     // Transform frontend request to backend format
@@ -421,7 +316,7 @@ export async function createContent(
       content: getDefaultContent(request.type),
     };
 
-    const response = await apiRequest<BackendContentResponse>('/api/v1/content', 'POST', backendRequest);
+    const response = await client.post<BackendContentResponse>('/api/v1/content', backendRequest);
     
     return {
       id: response.id,
@@ -430,6 +325,11 @@ export async function createContent(
     };
   } catch (error) {
     console.error('Error creating content:', error);
+    
+    // Convert to legacy ContentApiError for backward compatibility
+    if (error instanceof ApiError) {
+      throw new ContentApiError(error.status, error.message, error.code, error.details);
+    }
     throw error;
   }
 }
@@ -437,15 +337,20 @@ export async function createContent(
 /**
  * Fetch content page by ID
  */
-export async function fetchContentById(id: string, user: User): Promise<ContentPage | null> {
+export async function fetchContentById(id: string): Promise<ContentPage | null> {
   try {
-    const response = await apiRequest<BackendContentRead>(`/api/v1/content/${id}`);
+    const response = await client.get<BackendContentRead>(`/api/v1/content/${id}`);
     return backendContentPageToFrontend(response);
   } catch (error) {
-    if (error instanceof ContentApiError && error.status === 404) {
+    if (error instanceof ApiError && error.status === 404) {
       return null;
     }
     console.error('Error fetching content by ID:', error);
+    
+    // Convert to legacy ContentApiError for backward compatibility
+    if (error instanceof ApiError) {
+      throw new ContentApiError(error.status, error.message, error.code, error.details);
+    }
     throw error;
   }
 }
@@ -455,12 +360,11 @@ export async function fetchContentById(id: string, user: User): Promise<ContentP
  */
 export async function updateContent(
   id: string,
-  request: UpdateContentRequest,
-  user: User
+  request: UpdateContentRequest
 ): Promise<ContentPage> {
   try {
     // Transform frontend request to backend format
-    const backendRequest: any = {};
+    const backendRequest: Record<string, unknown> = {};
     
     if (request.title !== undefined) backendRequest.title = request.title;
     if (request.type !== undefined) backendRequest.type = request.type;
@@ -479,10 +383,15 @@ export async function updateContent(
     if (request.progress !== undefined) backendRequest.progress = request.progress;
     if (request.isPublic !== undefined) backendRequest.is_public = request.isPublic;
 
-    const response = await apiRequest<BackendContentRead>(`/api/v1/content/${id}`, 'PATCH', backendRequest);
+    const response = await client.patch<BackendContentRead>(`/api/v1/content/${id}`, backendRequest);
     return backendContentPageToFrontend(response);
   } catch (error) {
     console.error('Error updating content:', error);
+    
+    // Convert to legacy ContentApiError for backward compatibility
+    if (error instanceof ApiError) {
+      throw new ContentApiError(error.status, error.message, error.code, error.details);
+    }
     throw error;
   }
 }
@@ -490,11 +399,16 @@ export async function updateContent(
 /**
  * Delete content item
  */
-export async function deleteContent(id: string, user: User): Promise<void> {
+export async function deleteContent(id: string): Promise<void> {
   try {
-    await apiRequest<void>(`/api/v1/content/${id}`, 'DELETE');
+    await client.delete<void>(`/api/v1/content/${id}`);
   } catch (error) {
     console.error('Error deleting content:', error);
+    
+    // Convert to legacy ContentApiError for backward compatibility
+    if (error instanceof ApiError) {
+      throw new ContentApiError(error.status, error.message, error.code, error.details);
+    }
     throw error;
   }
 } 

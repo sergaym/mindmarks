@@ -3,8 +3,10 @@ import uuid
 from datetime import datetime, timedelta
 from typing import Dict, List, Optional, Union
 from uuid import UUID
-from sqlalchemy.orm import Session, joinedload
-from sqlalchemy import or_, and_, func, text
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import selectinload
+from sqlalchemy import or_, and_, func, text, select
+from sqlalchemy.exc import SQLAlchemyError, IntegrityError
 
 from app.db.models import User, Content, ContentCollaborator, ContentTypeEnum, ContentStatusEnum, ContentPriorityEnum
 from app.api.v1.schemas.content import (
@@ -16,25 +18,59 @@ logger = logging.getLogger(__name__)
 
 
 class ContentService:
-    def __init__(self, db: Session):
+    def __init__(self, db: AsyncSession):
         self.db = db
 
-    def get_content_by_id(self, content_id: UUID, user_id: UUID) -> Optional[Content]:
-        """Get content by ID with access control"""
-        return self.db.query(Content).options(
-            joinedload(Content.created_by),
-            joinedload(Content.last_edited_by),
-            joinedload(Content.collaborators).joinedload(ContentCollaborator.user)
-        ).filter(
-            Content.id == str(content_id),
-            or_(
-                Content.created_by_id == str(user_id),
-                Content.is_public == True,
-                Content.collaborators.any(ContentCollaborator.user_id == str(user_id))
-            )
-        ).first()
+    @staticmethod
+    def _convert_to_naive_datetime(dt: Optional[datetime]) -> Optional[datetime]:
+        """Convert timezone-aware datetime to timezone-naive datetime for database storage"""
+        if dt is None:
+            return None
+        if dt.tzinfo is not None:
+            # Convert to UTC and remove timezone info
+            utc_dt = dt.utctimetuple()
+            return datetime(utc_dt.tm_year, utc_dt.tm_mon, utc_dt.tm_mday, 
+                          utc_dt.tm_hour, utc_dt.tm_min, utc_dt.tm_sec)
+        return dt
 
-    def get_user_content(self, user_id: UUID, filters: Optional[ContentSearchFilters] = None) -> List[Content]:
+    async def get_content_by_id(self, content_id: UUID, user_id: UUID) -> Optional[Content]:
+        """Get content by ID with access control"""
+        try:
+            stmt = (
+                select(Content)
+                .options(
+                    selectinload(Content.created_by),
+                    selectinload(Content.last_edited_by),
+                    selectinload(Content.collaborators).selectinload(ContentCollaborator.user)
+                )
+                .where(
+                    and_(
+                        Content.id == str(content_id),
+                        or_(
+                            Content.created_by_id == str(user_id),
+                            Content.is_public == True,
+                            Content.collaborators.any(ContentCollaborator.user_id == str(user_id))
+                        )
+                    )
+                )
+            )
+            
+            result = await self.db.execute(stmt)
+            content = result.unique().scalar_one_or_none()
+            
+            if content:
+                logger.info(f"Retrieved content {content_id} for user {user_id}")
+            else:
+                logger.warning(f"Content {content_id} not found or access denied for user {user_id}")
+            
+            return content
+            
+        except SQLAlchemyError as e:
+            logger.error(f"Database error retrieving content {content_id}: {str(e)}")
+            raise
+        except Exception as e:
+            logger.error(f"Unexpected error retrieving content {content_id}: {str(e)}")
+            raise
         """Get all content accessible by a user with optional filtering"""
         query = self.db.query(Content).options(
             joinedload(Content.created_by),

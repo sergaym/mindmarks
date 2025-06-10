@@ -1,11 +1,11 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import { ContentPage, ContentPageMetadata, EditorContent } from '@/types/content';
-import { useContent } from '@/hooks/use-content';
+import dynamic from 'next/dynamic';
+import { ContentPageMetadata, EditorContent } from '@/types/content';
+import { useContentPage } from '@/hooks/use-content';
 import { ContentMetadataPanel } from '@/components/content/content-metadata-panel';
-import { ContentEditor } from '@/components/content/content-editor';
 import { ContentHeader } from '@/components/content/content-header';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Button } from '@/components/ui/button';
@@ -19,6 +19,22 @@ import {
   BreadcrumbSeparator,
 } from "@/components/ui/breadcrumb"
 import { useBreadcrumb } from '../../layout';
+
+// Dynamic import for heavy content editor
+const ContentEditor = dynamic(
+  () => import('@/components/content/content-editor').then(mod => ({ default: mod.ContentEditor })),
+  {
+    loading: () => (
+      <div className="space-y-4">
+        <Skeleton className="h-8 w-3/4" />
+        <Skeleton className="h-4 w-full" />
+        <Skeleton className="h-4 w-5/6" />
+        <Skeleton className="h-4 w-4/5" />
+      </div>
+    ),
+    ssr: false, // Editor is client-side only
+  }
+);
 
 export default function ContentPageView() {
   const params = useParams();

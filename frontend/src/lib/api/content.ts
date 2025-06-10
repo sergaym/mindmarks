@@ -125,16 +125,17 @@ export interface CreateContentResponse {
 }
 
 /**
- * Get authentication headers (for future API implementation)
+ * Get authentication headers
  */
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
 function getAuthHeaders(): Record<string, string> {
   if (typeof window === 'undefined') return {};
   
   const token = sessionStorage.getItem('access_token') || localStorage.getItem('access_token');
   const tokenType = localStorage.getItem('token_type') || 'Bearer';
   
-  if (!token) return {};
+  if (!token) {
+    throw new ContentApiError(401, 'No authentication token found');
+  }
   
   return {
     'Authorization': `${tokenType} ${token}`,
@@ -142,8 +143,131 @@ function getAuthHeaders(): Record<string, string> {
   };
 }
 
-// API request function will be implemented when backend endpoints are ready
-// async function apiRequest<T>(endpoint: string, method: string = 'GET', data?: unknown): Promise<T>
+/**
+ * Make API request with proper error handling
+ */
+async function apiRequest<T>(endpoint: string, method: string = 'GET', data?: unknown): Promise<T> {
+  const url = `${API_URL}${endpoint}`;
+  
+  try {
+    const config: RequestInit = {
+      method,
+      headers: getAuthHeaders(),
+    };
+    
+    if (data && (method === 'POST' || method === 'PUT' || method === 'PATCH')) {
+      config.body = JSON.stringify(data);
+    }
+    
+    console.log(`[API] ${method} ${url}`, data ? { data } : '');
+    
+    const response = await fetch(url, config);
+    
+    if (!response.ok) {
+      let errorMessage = `HTTP ${response.status}: ${response.statusText}`;
+      let errorDetails: unknown;
+      
+      try {
+        const errorData = await response.json();
+        errorMessage = errorData.detail || errorData.message || errorMessage;
+        errorDetails = errorData;
+      } catch {
+        // If we can't parse error response, use the status text
+      }
+      
+      throw new ContentApiError(
+        response.status,
+        errorMessage,
+        response.status.toString(),
+        errorDetails
+      );
+    }
+    
+    // Handle 204 No Content responses
+    if (response.status === 204) {
+      return undefined as T;
+    }
+    
+    const result = await response.json();
+    console.log(`[API] ${method} ${url} - Success:`, result);
+    return result;
+  } catch (error) {
+    if (error instanceof ContentApiError) {
+      throw error;
+    }
+    
+    console.error(`[API] ${method} ${url} - Error:`, error);
+    
+    if (error instanceof TypeError && error.message.includes('fetch')) {
+      throw new ContentApiError(0, 'Network error: Unable to connect to the server');
+    }
+    
+    throw new ContentApiError(500, 'An unexpected error occurred');
+  }
+}
+
+/**
+ * Convert backend ContentListItem to frontend ContentItem
+ */
+function backendContentToFrontend(backendContent: BackendContentListItem): ContentItem {
+  // Convert backend user to frontend User, providing default image if missing
+  const convertUser = (backendUser: { id: string; name: string; image?: string }): User => ({
+    id: backendUser.id,
+    name: backendUser.name,
+    image: backendUser.image || '/default-avatar.png', // Provide default image
+  });
+
+  return {
+    id: backendContent.id,
+    name: backendContent.name,
+    type: backendContent.type,
+    startAt: new Date(backendContent.start_at),
+    endAt: backendContent.end_at ? new Date(backendContent.end_at) : undefined,
+    column: backendContent.column,
+    owner: convertUser(backendContent.owner),
+    description: backendContent.description,
+    tags: backendContent.tags,
+    url: backendContent.url,
+    progress: backendContent.progress,
+    priority: backendContent.priority,
+  };
+}
+
+/**
+ * Convert backend ContentRead to frontend ContentPage
+ */
+function backendContentPageToFrontend(backendPage: BackendContentRead): ContentPage {
+  // Convert backend user to frontend User, providing default image if missing
+  const convertUser = (backendUser: { id: string; name: string; image?: string }): User => ({
+    id: backendUser.id,
+    name: backendUser.name,
+    image: backendUser.image || '/default-avatar.png', // Provide default image
+  });
+
+  return {
+    id: backendPage.id,
+    title: backendPage.title,
+    type: backendPage.type,
+    url: backendPage.url,
+    tags: backendPage.tags,
+    status: backendPage.status,
+    priority: backendPage.priority,
+    content: backendPage.content as EditorContent[],
+    summary: backendPage.summary,
+    keyTakeaways: backendPage.key_takeaways,
+    progress: backendPage.progress,
+    createdAt: new Date(backendPage.created_at),
+    updatedAt: new Date(backendPage.updated_at),
+    author: backendPage.author,
+    publishedDate: backendPage.published_date ? new Date(backendPage.published_date) : undefined,
+    estimatedReadTime: backendPage.estimated_read_time,
+    rating: backendPage.rating,
+    isPublic: backendPage.is_public,
+    createdBy: convertUser(backendPage.created_by),
+    lastEditedBy: backendPage.last_edited_by ? convertUser(backendPage.last_edited_by) : convertUser(backendPage.created_by),
+    collaborators: backendPage.collaborators.map(collab => convertUser(collab.user)),
+  };
+}
 
 /**
  * Convert ContentPage to ContentItem for dashboard view

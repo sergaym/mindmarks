@@ -248,28 +248,31 @@ export function useContent() {
 
   // Get content page by ID with caching
   const getContentPage = useCallback(async (id: string): Promise<ContentPage | null> => {
+    const user = getCurrentUser();
+    if (!user) {
+      throw new Error('Authentication required');
+    }
+
     try {
       // Check cache first
       const cached = persistentCache.pages.get(id);
       if (cached) {
+        console.log('[useContent] Returning cached content page for ID:', id);
         return cached;
       }
 
-      const user = await getCurrentUser();
-      if (!user) {
-        throw new Error('Authentication required');
-      }
-
+      console.log('[useContent] Fetching content page for ID:', id);
       const contentPage = await fetchContentById(id, user);
       
       if (contentPage) {
         // Update cache
         persistentCache.pages.set(id, contentPage);
+        console.log('[useContent] Cached content page for ID:', id);
       }
       
       return contentPage;
     } catch (error) {
-      console.error('Error fetching content page:', error);
+      console.error('[useContent] Error fetching content page:', error);
       
       if (error instanceof ContentApiError && error.status === 404) {
         return null;
@@ -284,12 +287,12 @@ export function useContent() {
     id: string, 
     updates: Partial<ContentPage>
   ): Promise<boolean> => {
-    try {
-      const user = await getCurrentUser();
-      if (!user) {
-        throw new Error('Authentication required');
-      }
+    const user = getCurrentUser();
+    if (!user) {
+      throw new Error('Authentication required');
+    }
 
+    try {
       // Transform frontend updates to API format
       const updateRequest: UpdateContentRequest = {
         title: updates.title,
@@ -312,6 +315,7 @@ export function useContent() {
         }
       });
 
+      console.log('[useContent] Updating content page:', id, updateRequest);
       const updatedPage = await updateContentApi(id, updateRequest, user);
       
       // Update cache
@@ -328,30 +332,32 @@ export function useContent() {
           url: updatedPage.url,
           tags: updatedPage.tags,
           column: updatedPage.status === 'planned' ? 'planned' : 
-                  updatedPage.status === 'completed' ? 'done' : 'in-progress',
+                  updatedPage.status === 'completed' ? 'done' : 'in_progress',
           priority: updatedPage.priority,
           progress: updatedPage.progress,
         };
         setContent(updatedContent);
+        persistentCache.content = updatedContent;
       }
       
+      console.log('[useContent] Successfully updated content page:', id);
       return true;
     } catch (error) {
-      console.error('Error updating content page:', error);
+      console.error('[useContent] Error updating content page:', error);
       return false;
     }
   }, [content, getCurrentUser]);
 
   // Update content items (for kanban operations)
   const updateContent = useCallback(async (updatedContent: ContentItem[]): Promise<{ status: Status }> => {
+    const user = getCurrentUser();
+    if (!user) {
+      return { status: 'error' };
+    }
+
     setStatus('loading');
     
     try {
-      const user = await getCurrentUser();
-      if (!user) {
-        return { status: 'error' };
-      }
-
       // Find what changed and update on backend
       const updatePromises = updatedContent.map(async (item) => {
         const originalItem = content.find(c => c.id === item.id);
@@ -360,8 +366,9 @@ export function useContent() {
         // Check if status changed
         if (originalItem.column !== item.column) {
           const newStatus = item.column === 'planned' ? 'planned' : 
-                           item.column === 'done' ? 'completed' : 'in-progress';
+                           item.column === 'done' ? 'completed' : 'in_progress';
           
+          console.log('[useContent] Updating content status:', item.id, newStatus);
           await updateContentApi(item.id, { status: newStatus }, user);
         }
       });
@@ -369,11 +376,12 @@ export function useContent() {
       await Promise.all(updatePromises);
       
       setContent(updatedContent);
+      persistentCache.content = updatedContent;
       setStatus('success');
       
       return { status: 'success' };
     } catch (error) {
-      console.error('Error updating content:', error);
+      console.error('[useContent] Error updating content:', error);
       setError('Failed to update content');
       setStatus('error');
       return { status: 'error' };
@@ -382,26 +390,30 @@ export function useContent() {
 
   // Remove content item
   const removeContent = useCallback(async (id: string) => {
+    const user = getCurrentUser();
+    if (!user) {
+      throw new Error('Authentication required');
+    }
+
     setStatus('loading');
     
     try {
-      const user = await getCurrentUser();
-      if (!user) {
-        throw new Error('Authentication required');
-      }
+      console.log('[useContent] Deleting content:', id);
       await deleteContent(id, user);
       
       // Update local state
       const newContent = content.filter(item => item.id !== id);
       setContent(newContent);
+      persistentCache.content = newContent;
       
       // Clear cache
       persistentCache.pages.delete(id);
       
       setStatus('success');
+      console.log('[useContent] Successfully deleted content:', id);
       return { status: 'success' as Status, data: newContent };
     } catch (error) {
-      console.error('Error removing content:', error);
+      console.error('[useContent] Error removing content:', error);
       
       let errorMessage = 'Failed to delete content';
       if (error instanceof ContentApiError) {
@@ -414,13 +426,9 @@ export function useContent() {
     }
   }, [content, getCurrentUser]);
 
-  // Get current user synchronously (for components that need immediate access)
-  const getCurrentUserSync = useCallback(() => {
-    return currentUser;
-  }, [currentUser]);
-
   // Refresh content from server
   const refreshContent = useCallback(() => {
+    console.log('[useContent] Refreshing content from server...');
     // Clear cache
     persistentCache.pages.clear();
     persistentCache.lastFetch = 0;
@@ -433,14 +441,14 @@ export function useContent() {
     content,
     status,
     error,
-    currentUser,
+    currentUser: getCurrentUser(), // Return current user synchronously
     isRefreshing,
     updateContent,
     addContent,
     removeContent,
     getContentPage,
     updateContentPage,
-    getCurrentUser: getCurrentUserSync,
+    getCurrentUser,
     refreshContent,
     // Legacy compatibility
     setContent,

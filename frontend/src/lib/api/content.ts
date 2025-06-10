@@ -23,7 +23,7 @@ export interface CreateContentRequest {
   url?: string;
   description?: string;
   tags?: string[];
-  status: 'planned' | 'in-progress' | 'completed' | 'archived';
+  status: 'planned' | 'in_progress' | 'completed' | 'archived';
   priority: 'low' | 'medium' | 'high';
 }
 
@@ -33,7 +33,7 @@ export interface UpdateContentRequest {
   url?: string;
   description?: string;
   tags?: string[];
-  status?: 'planned' | 'in-progress' | 'completed' | 'archived';
+  status?: 'planned' | 'in_progress' | 'completed' | 'archived';
   priority?: 'low' | 'medium' | 'high';
   content?: EditorContent[];
   summary?: string;
@@ -44,6 +44,77 @@ export interface UpdateContentRequest {
   rating?: number;
   progress?: number;
   isPublic?: boolean;
+}
+
+// Backend response types (matching the backend schemas)
+export interface BackendContentListItem {
+  id: string;
+  name: string;
+  type: ContentType;
+  start_at: string; // ISO date string
+  end_at?: string;
+  column: string;
+  owner: {
+    id: string;
+    name: string;
+    image?: string;
+  };
+  description?: string;
+  tags: string[];
+  url?: string;
+  progress: number;
+  priority: 'low' | 'medium' | 'high';
+}
+
+export interface BackendContentRead {
+  id: string;
+  title: string;
+  type: ContentType;
+  url?: string;
+  summary?: string;
+  tags: string[];
+  status: 'planned' | 'in_progress' | 'completed' | 'archived';
+  priority: 'low' | 'medium' | 'high';
+  content: Array<{
+    type: string;
+    children: Array<{ [key: string]: any }>;
+    attrs?: { [key: string]: any };
+  }>;
+  key_takeaways: string[];
+  progress: number;
+  created_at: string;
+  updated_at: string;
+  author?: string;
+  published_date?: string;
+  estimated_read_time?: number;
+  rating?: number;
+  is_public: boolean;
+  created_by: {
+    id: string;
+    name: string;
+    image?: string;
+  };
+  last_edited_by?: {
+    id: string;
+    name: string;
+    image?: string;
+  };
+  collaborators: Array<{
+    user: {
+      id: string;
+      name: string;
+      image?: string;
+    };
+    permission: string;
+    invited_at: string;
+    accepted_at?: string;
+  }>;
+}
+
+export interface BackendContentResponse {
+  id: string;
+  content: BackendContentListItem;
+  content_page: BackendContentRead;
 }
 
 // Response types

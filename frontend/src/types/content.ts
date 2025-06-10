@@ -36,7 +36,7 @@ export interface ContentPage {
   type: ContentType;
   url?: string;
   tags: string[];
-  status: 'planned' | 'in-progress' | 'completed' | 'archived';
+  status: 'planned' | 'in_progress' | 'completed' | 'archived';
   priority: 'low' | 'medium' | 'high';
   
   // Rich metadata
@@ -111,7 +111,7 @@ export interface ContentPageMetadata {
   type: ContentType;
   url?: string;
   tags: string[];
-  status: 'planned' | 'in-progress' | 'completed' | 'archived';
+  status: 'planned' | 'in_progress' | 'completed' | 'archived';
   priority: 'low' | 'medium' | 'high';
   author?: string;
   publishedDate?: Date;

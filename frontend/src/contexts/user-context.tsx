@@ -1,8 +1,8 @@
 'use client';
 
-import React, { createContext, useState, useEffect, ReactNode, useCallback } from 'react';
+import React, { createContext, useState, useEffect, ReactNode, useCallback, useRef } from 'react';
 import { User } from '@/types/content';
-import { apiClient, AuthenticationError, ApiError } from '@/lib/api/client';
+import { client, AuthenticationError, ApiError } from '@/lib/api/client';
 import { isTokenExpiringSoon, refreshAccessToken } from '@/lib/api/auth';
 
 // Context type definition
@@ -43,7 +43,10 @@ export function UserProvider({ children }: UserProviderProps) {
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [hasFetched, setHasFetched] = useState(false);
+  
+  // Use ref to track if we're currently fetching to prevent race conditions
+  const isFetchingRef = useRef(false);
+  const hasInitializedRef = useRef(false);
 
   const clearUser = () => {
     setUser(null);
@@ -57,11 +60,19 @@ export function UserProvider({ children }: UserProviderProps) {
   };
 
   const fetchUserData = useCallback(async () => {
-    // Prevent multiple simultaneous calls
-    if (hasFetched && !error) {
+    // Prevent multiple simultaneous calls (React 18 StrictMode protection)
+    if (isFetchingRef.current) {
+      console.log('[UserProvider] Already fetching user data, skipping...');
       return;
     }
 
+    // If already initialized and no error, don't fetch again
+    if (hasInitializedRef.current && !error) {
+      console.log('[UserProvider] Already initialized, skipping fetch...');
+      return;
+    }
+
+    isFetchingRef.current = true;
     setIsLoading(true);
     setError(null);
     
@@ -72,10 +83,9 @@ export function UserProvider({ children }: UserProviderProps) {
         (sessionStorage.getItem('access_token') || localStorage.getItem('access_token'));
       
       if (!hasAccessToken) {
-        // No access token available
         setUser(null);
         setIsLoading(false);
-        setHasFetched(true);
+        hasInitializedRef.current = true;
         return;
       }
       
@@ -84,21 +94,17 @@ export function UserProvider({ children }: UserProviderProps) {
         try {
           const refreshResult = await refreshAccessToken();
           if (!refreshResult.success) {
-            // Refresh failed, clear tokens
             clearUser();
             setIsLoading(false);
-            setHasFetched(true);
+            hasInitializedRef.current = true;
             return;
           }
-        } catch (refreshError) {
-          console.warn('Token refresh failed:', refreshError);
-          // Continue with existing token and let the API call handle it
+        } catch {
         }
       }
       
       // Fetch user data from the API
-      const response = await apiClient.get<ApiUser>('/api/v1/users/me');
-      const apiUserData = response.data;
+      const apiUserData = await client.get<ApiUser>('/api/v1/users/me');
       
       // Transform API response to match our User interface
       const userData: User = {
@@ -115,10 +121,8 @@ export function UserProvider({ children }: UserProviderProps) {
         localStorage.setItem('user_email', apiUserData.email);
       }
     } catch (err) {
-      console.error('Failed to fetch user data:', err);
       
       if (err instanceof AuthenticationError) {
-        console.log('Authentication failed, clearing tokens');
         clearUser();
         
         // Redirect to login if not already there
@@ -128,35 +132,43 @@ export function UserProvider({ children }: UserProviderProps) {
         
         setError('Authentication failed. Please log in again.');
       } else if (err instanceof ApiError) {
-        console.error('API Error:', err.message);
         setError(`Failed to fetch user data: ${err.message}`);
         setUser(null);
       } else {
-        console.error('Unexpected error:', err);
         setError('An unexpected error occurred');
         setUser(null);
       }
     } finally {
       setIsLoading(false);
-      setHasFetched(true);
+      hasInitializedRef.current = true;
+      isFetchingRef.current = false;
+      console.log('[UserProvider] User data fetch completed');
     }
-  }, [hasFetched, error]);
+  }, [error]); // Only depend on error to allow retries
 
   // Development mode fallback user
   useEffect(() => {
-    if (!user && !isLoading && !error && process.env.NODE_ENV === 'development' && hasFetched) {
+    if (!user && !isLoading && !error && process.env.NODE_ENV === 'development' && hasInitializedRef.current) {
       setUser({
         id: 'dev-user-1',
         name: 'Development User',
         image: '/default-avatar.png',
       });
     }
-  }, [user, isLoading, error, hasFetched]);
+  }, [user, isLoading, error]);
 
-  // Fetch user data on mount
+  // Fetch user data on mount - with cleanup for React 18 StrictMode
   useEffect(() => {
-    fetchUserData();
-  }, [fetchUserData]);
+    
+    if (!hasInitializedRef.current) {
+      fetchUserData();
+    }
+
+    // Cleanup function for React 18 StrictMode
+    return () => {
+      isFetchingRef.current = false;
+    };
+  }, [fetchUserData]); // Add fetchUserData to dependencies
 
   const contextValue: UserContextType = {
     user,

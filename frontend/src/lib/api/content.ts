@@ -1,17 +1,10 @@
 import { ContentItem, ContentType, User, ContentPage, EditorContent } from '@/types/content';
+import { client, ApiError } from './client';
 
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
-const API_URL = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:8000';
-
-// Error class for content API errors
-export class ContentApiError extends Error {
-  constructor(
-    public status: number,
-    public message: string,
-    public code?: string,
-    public details?: unknown
-  ) {
-    super(message);
+// Legacy alias for backward compatibility
+export class ContentApiError extends ApiError {
+  constructor(status: number, message: string, code?: string, details?: unknown) {
+    super(status, message, code, details);
     this.name = 'ContentApiError';
   }
 }
@@ -23,7 +16,7 @@ export interface CreateContentRequest {
   url?: string;
   description?: string;
   tags?: string[];
-  status: 'planned' | 'in-progress' | 'completed' | 'archived';
+  status: 'planned' | 'in_progress' | 'completed' | 'archived';
   priority: 'low' | 'medium' | 'high';
 }
 
@@ -33,7 +26,7 @@ export interface UpdateContentRequest {
   url?: string;
   description?: string;
   tags?: string[];
-  status?: 'planned' | 'in-progress' | 'completed' | 'archived';
+  status?: 'planned' | 'in_progress' | 'completed' | 'archived';
   priority?: 'low' | 'medium' | 'high';
   content?: EditorContent[];
   summary?: string;
@@ -46,6 +39,77 @@ export interface UpdateContentRequest {
   isPublic?: boolean;
 }
 
+// Backend response types (matching the backend schemas)
+export interface BackendContentListItem {
+  id: string;
+  name: string;
+  type: ContentType;
+  start_at: string; // ISO date string
+  end_at?: string;
+  column: string;
+  owner: {
+    id: string;
+    name: string;
+    image?: string;
+  };
+  description?: string;
+  tags: string[];
+  url?: string;
+  progress: number;
+  priority: 'low' | 'medium' | 'high';
+}
+
+export interface BackendContentRead {
+  id: string;
+  title: string;
+  type: ContentType;
+  url?: string;
+  summary?: string;
+  tags: string[];
+  status: 'planned' | 'in_progress' | 'completed' | 'archived';
+  priority: 'low' | 'medium' | 'high';
+  content: Array<{
+    type: string;
+    children: Array<Record<string, unknown>>;
+    attrs?: Record<string, unknown>;
+  }>;
+  key_takeaways: string[];
+  progress: number;
+  created_at: string;
+  updated_at: string;
+  author?: string;
+  published_date?: string;
+  estimated_read_time?: number;
+  rating?: number;
+  is_public: boolean;
+  created_by: {
+    id: string;
+    name: string;
+    image?: string;
+  };
+  last_edited_by?: {
+    id: string;
+    name: string;
+    image?: string;
+  };
+  collaborators: Array<{
+    user: {
+      id: string;
+      name: string;
+      image?: string;
+    };
+    permission: string;
+    invited_at: string;
+    accepted_at?: string;
+  }>;
+}
+
+export interface BackendContentResponse {
+  id: string;
+  content: BackendContentListItem;
+  content_page: BackendContentRead;
+}
+
 // Response types
 export interface CreateContentResponse {
   id: string;
@@ -54,43 +118,65 @@ export interface CreateContentResponse {
 }
 
 /**
- * Get authentication headers (for future API implementation)
+ * Convert backend ContentListItem to frontend ContentItem
  */
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
-function getAuthHeaders(): Record<string, string> {
-  if (typeof window === 'undefined') return {};
-  
-  const token = sessionStorage.getItem('access_token') || localStorage.getItem('access_token');
-  const tokenType = localStorage.getItem('token_type') || 'Bearer';
-  
-  if (!token) return {};
-  
+function backendContentToFrontend(backendContent: BackendContentListItem): ContentItem {
+  // Convert backend user to frontend User, providing default image if missing
+  const convertUser = (backendUser: { id: string; name: string; image?: string }): User => ({
+    id: backendUser.id,
+    name: backendUser.name,
+    image: backendUser.image || '/default-avatar.png', // Provide default image
+  });
+
   return {
-    'Authorization': `${tokenType} ${token}`,
-    'Content-Type': 'application/json',
+    id: backendContent.id,
+    name: backendContent.name,
+    type: backendContent.type,
+    startAt: new Date(backendContent.start_at),
+    endAt: backendContent.end_at ? new Date(backendContent.end_at) : undefined,
+    column: backendContent.column,
+    owner: convertUser(backendContent.owner),
+    description: backendContent.description,
+    tags: backendContent.tags,
+    url: backendContent.url,
+    progress: backendContent.progress,
+    priority: backendContent.priority,
   };
 }
 
-// API request function will be implemented when backend endpoints are ready
-// async function apiRequest<T>(endpoint: string, method: string = 'GET', data?: unknown): Promise<T>
-
 /**
- * Convert ContentPage to ContentItem for dashboard view
+ * Convert backend ContentRead to frontend ContentPage
  */
-function contentPageToItem(page: ContentPage): ContentItem {
+function backendContentPageToFrontend(backendPage: BackendContentRead): ContentPage {
+  // Convert backend user to frontend User, providing default image if missing
+  const convertUser = (backendUser: { id: string; name: string; image?: string }): User => ({
+    id: backendUser.id,
+    name: backendUser.name,
+    image: backendUser.image || '/default-avatar.png', // Provide default image
+  });
+
   return {
-    id: page.id,
-    name: page.title,
-    startAt: page.createdAt,
-    endAt: undefined, // Can be enhanced based on content type
-    column: page.status,
-    owner: page.createdBy,
-    type: page.type,
-    description: page.summary,
-    tags: page.tags,
-    url: page.url,
-    progress: page.progress,
-    priority: page.priority,
+    id: backendPage.id,
+    title: backendPage.title,
+    type: backendPage.type,
+    url: backendPage.url,
+    tags: backendPage.tags,
+    status: backendPage.status,
+    priority: backendPage.priority,
+    content: backendPage.content as EditorContent[],
+    summary: backendPage.summary,
+    keyTakeaways: backendPage.key_takeaways,
+    progress: backendPage.progress,
+    createdAt: new Date(backendPage.created_at),
+    updatedAt: new Date(backendPage.updated_at),
+    author: backendPage.author,
+    publishedDate: backendPage.published_date ? new Date(backendPage.published_date) : undefined,
+    estimatedReadTime: backendPage.estimated_read_time,
+    rating: backendPage.rating,
+    isPublic: backendPage.is_public,
+    createdBy: convertUser(backendPage.created_by),
+    lastEditedBy: backendPage.last_edited_by ? convertUser(backendPage.last_edited_by) : convertUser(backendPage.created_by),
+    collaborators: backendPage.collaborators.map(collab => convertUser(collab.user)),
   };
 }
 
@@ -196,56 +282,17 @@ function getDefaultContent(type: ContentType): EditorContent[] {
 /**
  * Fetch user's content items
  */
-export async function fetchUserContent(user: User): Promise<ContentItem[]> {
+export async function fetchUserContent(): Promise<ContentItem[]> {
   try {
-    // For now, return mock data since backend endpoints may not be fully implemented
-    // In a real implementation, this would call: /api/v1/content/user/${user.id}
-    
-    const mockContentPages: ContentPage[] = [
-      {
-        id: '1',
-        title: 'Clean Code',
-        type: 'book',
-        tags: ['programming', 'best-practices'],
-        status: 'in-progress',
-        priority: 'high',
-        content: getDefaultContent('book'),
-        createdAt: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000),
-        updatedAt: new Date(),
-        createdBy: user,
-        lastEditedBy: user,
-        isPublic: false,
-        collaborators: [],
-        progress: 45,
-        author: 'Robert C. Martin',
-        estimatedReadTime: 480,
-      },
-      {
-        id: '2',
-        title: 'React Best Practices',
-        type: 'article',
-        url: 'https://example.com/react-best-practices',
-        tags: ['react', 'frontend'],
-        status: 'planned',
-        priority: 'medium',
-        content: getDefaultContent('article'),
-        createdAt: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000),
-        updatedAt: new Date(),
-        createdBy: user,
-        lastEditedBy: user,
-        isPublic: false,
-        collaborators: [],
-        estimatedReadTime: 15,
-      },
-    ];
-
-    return mockContentPages.map(contentPageToItem);
-    
-    // Real implementation would be:
-    // const response = await apiRequest<ContentPage[]>(`/api/v1/content/user/${user.id}`);
-    // return response.map(contentPageToItem);
+    const response = await client.get<BackendContentListItem[]>('/api/v1/content/me');
+    return response.map(backendContentToFrontend);
   } catch (error) {
     console.error('Error fetching user content:', error);
+    
+    // Convert to legacy ContentApiError for backward compatibility
+    if (error instanceof ApiError) {
+      throw new ContentApiError(error.status, error.message, error.code, error.details);
+    }
     throw error;
   }
 }
@@ -254,45 +301,35 @@ export async function fetchUserContent(user: User): Promise<ContentItem[]> {
  * Create new content item
  */
 export async function createContent(
-  request: CreateContentRequest,
-  user: User
+  request: CreateContentRequest
 ): Promise<CreateContentResponse> {
   try {
-    // Create a mock response for now
-    const id = Date.now().toString();
-    const now = new Date();
-    
-    const contentPage: ContentPage = {
-      id,
+    // Transform frontend request to backend format
+    const backendRequest = {
       title: request.title,
       type: request.type,
       url: request.url,
+      description: request.description,
       tags: request.tags || [],
       status: request.status,
       priority: request.priority,
       content: getDefaultContent(request.type),
-      summary: request.description,
-      createdAt: now,
-      updatedAt: now,
-      createdBy: user,
-      lastEditedBy: user,
-      isPublic: false,
-      collaborators: [],
     };
 
-    const contentItem = contentPageToItem(contentPage);
-
-    // Real implementation would be:
-    // const response = await apiRequest<CreateContentResponse>('/api/v1/content', 'POST', request);
-    // return response;
-
+    const response = await client.post<BackendContentResponse>('/api/v1/content', backendRequest);
+    
     return {
-      id,
-      content: contentItem,
-      contentPage,
+      id: response.id,
+      content: backendContentToFrontend(response.content),
+      contentPage: backendContentPageToFrontend(response.content_page),
     };
   } catch (error) {
     console.error('Error creating content:', error);
+    
+    // Convert to legacy ContentApiError for backward compatibility
+    if (error instanceof ApiError) {
+      throw new ContentApiError(error.status, error.message, error.code, error.details);
+    }
     throw error;
   }
 }
@@ -300,34 +337,20 @@ export async function createContent(
 /**
  * Fetch content page by ID
  */
-export async function fetchContentById(id: string, user: User): Promise<ContentPage | null> {
+export async function fetchContentById(id: string): Promise<ContentPage | null> {
   try {
-    // Mock implementation
-    const mockPage: ContentPage = {
-      id,
-      title: 'Sample Content',
-      type: 'article',
-      tags: ['sample'],
-      status: 'planned',
-      priority: 'medium',
-      content: getDefaultContent('article'),
-      createdAt: new Date(),
-      updatedAt: new Date(),
-      createdBy: user,
-      lastEditedBy: user,
-      isPublic: false,
-      collaborators: [],
-    };
-
-    return mockPage;
-
-    // Real implementation would be:
-    // return await apiRequest<ContentPage>(`/api/v1/content/${id}`);
+    const response = await client.get<BackendContentRead>(`/api/v1/content/${id}`);
+    return backendContentPageToFrontend(response);
   } catch (error) {
-    if (error instanceof ContentApiError && error.status === 404) {
+    if (error instanceof ApiError && error.status === 404) {
       return null;
     }
     console.error('Error fetching content by ID:', error);
+    
+    // Convert to legacy ContentApiError for backward compatibility
+    if (error instanceof ApiError) {
+      throw new ContentApiError(error.status, error.message, error.code, error.details);
+    }
     throw error;
   }
 }
@@ -337,42 +360,38 @@ export async function fetchContentById(id: string, user: User): Promise<ContentP
  */
 export async function updateContent(
   id: string,
-  request: UpdateContentRequest,
-  user: User
+  request: UpdateContentRequest
 ): Promise<ContentPage> {
   try {
-    // Mock implementation
-    const now = new Date();
-    const updatedPage: ContentPage = {
-      id,
-      title: request.title || 'Updated Content',
-      type: request.type || 'article',
-      url: request.url,
-      tags: request.tags || [],
-      status: request.status || 'planned',
-      priority: request.priority || 'medium',
-      content: request.content || getDefaultContent(request.type || 'article'),
-      summary: request.summary,
-      keyTakeaways: request.keyTakeaways,
-      author: request.author,
-      publishedDate: request.publishedDate,
-      estimatedReadTime: request.estimatedReadTime,
-      rating: request.rating,
-      progress: request.progress,
-      createdAt: new Date(Date.now() - 24 * 60 * 60 * 1000), // Yesterday
-      updatedAt: now,
-      createdBy: user,
-      lastEditedBy: user,
-      isPublic: request.isPublic || false,
-      collaborators: [],
-    };
+    // Transform frontend request to backend format
+    const backendRequest: Record<string, unknown> = {};
+    
+    if (request.title !== undefined) backendRequest.title = request.title;
+    if (request.type !== undefined) backendRequest.type = request.type;
+    if (request.url !== undefined) backendRequest.url = request.url;
+    if (request.description !== undefined) backendRequest.description = request.description;
+    if (request.tags !== undefined) backendRequest.tags = request.tags;
+    if (request.status !== undefined) backendRequest.status = request.status;
+    if (request.priority !== undefined) backendRequest.priority = request.priority;
+    if (request.content !== undefined) backendRequest.content = request.content;
+    if (request.summary !== undefined) backendRequest.summary = request.summary;
+    if (request.keyTakeaways !== undefined) backendRequest.key_takeaways = request.keyTakeaways;
+    if (request.author !== undefined) backendRequest.author = request.author;
+    if (request.publishedDate !== undefined) backendRequest.published_date = request.publishedDate.toISOString();
+    if (request.estimatedReadTime !== undefined) backendRequest.estimated_read_time = request.estimatedReadTime;
+    if (request.rating !== undefined) backendRequest.rating = request.rating;
+    if (request.progress !== undefined) backendRequest.progress = request.progress;
+    if (request.isPublic !== undefined) backendRequest.is_public = request.isPublic;
 
-    return updatedPage;
-
-    // Real implementation would be:
-    // return await apiRequest<ContentPage>(`/api/v1/content/${id}`, 'PUT', request);
+    const response = await client.patch<BackendContentRead>(`/api/v1/content/${id}`, backendRequest);
+    return backendContentPageToFrontend(response);
   } catch (error) {
     console.error('Error updating content:', error);
+    
+    // Convert to legacy ContentApiError for backward compatibility
+    if (error instanceof ApiError) {
+      throw new ContentApiError(error.status, error.message, error.code, error.details);
+    }
     throw error;
   }
 }
@@ -380,15 +399,16 @@ export async function updateContent(
 /**
  * Delete content item
  */
-export async function deleteContent(id: string, user: User): Promise<void> {
+export async function deleteContent(id: string): Promise<void> {
   try {
-    // Mock implementation - just return success
-    console.log(`Deleting content ${id} for user ${user.id}`);
-
-    // Real implementation would be:
-    // await apiRequest(`/api/v1/content/${id}`, 'DELETE');
+    await client.delete<void>(`/api/v1/content/${id}`);
   } catch (error) {
     console.error('Error deleting content:', error);
+    
+    // Convert to legacy ContentApiError for backward compatibility
+    if (error instanceof ApiError) {
+      throw new ContentApiError(error.status, error.message, error.code, error.details);
+    }
     throw error;
   }
 } 

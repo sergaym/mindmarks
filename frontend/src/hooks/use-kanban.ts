@@ -6,7 +6,7 @@ import { KanbanColumn, ContentItem } from '@/types/content';
 // Default columns for the Kanban board
 const defaultColumns: KanbanColumn[] = [
   { id: "planned", name: 'To Read', color: '#6B7280' },
-  { id: "in-progress", name: 'In Progress', color: '#F59E0B' },
+  { id: "in_progress", name: 'In Progress', color: '#F59E0B' },
   { id: "done", name: 'Completed', color: '#10B981' },
 ];
 

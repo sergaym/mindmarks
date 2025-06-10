@@ -3,7 +3,49 @@ import type { NextConfig } from "next";
 const nextConfig: NextConfig = {
   // Performance optimizations
   experimental: {
-    optimizePackageImports: ['@radix-ui/react-*', '@tabler/icons-react', 'lucide-react'],
+    optimizePackageImports: ['@udecode/plate', '@radix-ui/react-*'],
+  },
+  
+  // Turbopack configuration (moved from experimental.turbo)
+  turbopack: {
+    rules: {
+      '*.svg': {
+        loaders: ['@svgr/webpack'],
+        as: '*.js',
+      },
+    },
+  },
+  
+  // Bundle analyzer for production optimization
+  webpack: (config, { isServer, dev }) => {
+    // Optimize bundle size for client-side
+    if (!isServer && !dev) {
+      config.optimization = {
+        ...config.optimization,
+        splitChunks: {
+          ...config.optimization.splitChunks,
+          cacheGroups: {
+            ...config.optimization.splitChunks.cacheGroups,
+            editor: {
+              name: 'editor',
+              test: /@udecode\/plate/,
+              chunks: 'all',
+              enforce: true,
+              priority: 20,
+            },
+            ui: {
+              name: 'ui',
+              test: /@radix-ui/,
+              chunks: 'all',
+              enforce: true,
+              priority: 15,
+            },
+          },
+        },
+      };
+    }
+
+    return config;
   },
   
   // Security headers
@@ -37,27 +79,33 @@ const nextConfig: NextConfig = {
     ];
   },
   
+  // Environment variables validation
+  env: {
+    NEXT_PUBLIC_BACKEND_URL: process.env.NEXT_PUBLIC_BACKEND_URL,
+    NEXT_PUBLIC_APP_URL: process.env.NEXT_PUBLIC_APP_URL,
+  },
+  
   // Image optimization
   images: {
-    formats: ['image/avif', 'image/webp'],
+    domains: ['ui-avatars.com'],
+    formats: ['image/webp', 'image/avif'],
     deviceSizes: [640, 750, 828, 1080, 1200, 1920, 2048, 3840],
     minimumCacheTTL: 60,
   },
   
-  // Compiler optimizations
-  compiler: {
-    removeConsole: process.env.NODE_ENV === 'production',
-  },
+  // Compression
+  compress: true,
   
-  // Bundle analyzer (only in development)
-  ...(process.env.ANALYZE === 'true' && {
-    webpack: (config: any) => {
-      config.plugins.push(
-        new (require('@next/bundle-analyzer')({
-          enabled: true,
-        }))()
-      );
-      return config;
+  // Power optimization for build
+  poweredByHeader: false,
+  
+  // Static optimization
+  trailingSlash: false,
+  
+  // Development optimization
+  ...(process.env.NODE_ENV === 'development' && {
+    devIndicators: {
+      position: 'bottom-right',
     },
   }),
 };

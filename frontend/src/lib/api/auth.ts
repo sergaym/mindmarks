@@ -1,4 +1,5 @@
 import { jwtDecode } from 'jwt-decode';
+import { client, ApiError } from './client';
 
 // Define user types
 export type User = {
@@ -21,12 +22,6 @@ export interface JwtPayload {
   [key: string]: string | number | boolean | undefined;
 }
 
-export type ApiError = {
-  status: number;
-  message: string;
-  code?: string;
-};
-
 export type AuthResult<T> = 
   | { success: true; data: T } 
   | { success: false; error: ApiError };
@@ -41,88 +36,18 @@ export interface PasswordResetData {
 }
 
 /**
- * Makes a request to the API with the appropriate content type
+ * Convert API errors to AuthResult format
  */
-async function apiRequest<T>(
-  endpoint: string, 
-  method: string, 
-  data?: Record<string, unknown>, 
-  token?: string,
-  contentType: 'json' | 'form-urlencoded' = 'form-urlencoded'
-): Promise<T> {
-  const headers: Record<string, string> = {
-    'Content-Type': contentType === 'json' 
-      ? 'application/json'
-      : 'application/x-www-form-urlencoded',
+function handleApiError(error: unknown): { success: false; error: ApiError } {
+  if (error instanceof ApiError) {
+    return { success: false, error };
+  }
+  
+  console.error('Unexpected error:', error);
+  return {
+    success: false,
+    error: new ApiError(500, 'An unexpected error occurred', 'UNKNOWN_ERROR')
   };
-
-  if (token) {
-    headers['Authorization'] = `Bearer ${token}`;
-  }
-
-  // Prepare request options
-  const options: RequestInit = {
-    method,
-    headers,
-    credentials: 'include', // Include cookies in requests
-  };
-
-  // Format the request body based on content type
-  if (data) {
-    if (contentType === 'json') {
-      options.body = JSON.stringify(data);
-    } else {
-      // Convert data to form-urlencoded format
-      const formData = new URLSearchParams();
-      Object.entries(data).forEach(([key, value]) => {
-        formData.append(key, String(value));
-      });
-      options.body = formData.toString();
-    }
-  }
-
-  // Make the request
-  const apiUrl = `${process.env.NEXT_PUBLIC_BACKEND_URL}${endpoint}`;
-  const response = await fetch(apiUrl, options);
-
-  // Handle errors
-  if (!response.ok) {
-    let errorMessage: string;
-    let errorCode: string | undefined;
-
-    try {
-      // Try to parse JSON error response
-      const errorData = await response.json();
-      
-      // Handle different API error response formats
-      if (errorData.detail) {
-        // FastAPI format: {"detail": "message"}
-        errorMessage = errorData.detail;
-      } else if (errorData.message) {
-        // Custom format: {"message": "text", "code": "ERROR_CODE"}
-        errorMessage = errorData.message;
-        errorCode = errorData.code;
-      } else if (typeof errorData === 'string') {
-        errorMessage = errorData;
-      } else {
-        // Fallback for unknown JSON structure
-        errorMessage = JSON.stringify(errorData);
-      }
-    } catch {
-      // If JSON parsing fails, use response text
-      errorMessage = await response.text() || `HTTP ${response.status} Error`;
-    }
-
-    const error: ApiError = {
-      status: response.status,
-      message: errorMessage,
-      code: errorCode
-    };
-    throw error;
-  }
-
-  // Return response data
-  return response.json() as T;
 }
 
 /**
@@ -130,18 +55,13 @@ async function apiRequest<T>(
  */
 export async function fetchUser(token: string): Promise<AuthResult<User>> {
   try {
-    const userData = await apiRequest<User>('/api/v1/users/me', 'GET', undefined, token);
+    const userData = await client.get<User>('/api/v1/users/me', {
+      headers: { 'Authorization': `Bearer ${token}` },
+      requiresAuth: false // We're providing the token manually
+    });
     return { success: true, data: userData };
-  } catch (err) {
-    const error = err as ApiError;
-    return { 
-      success: false, 
-      error: {
-        status: error.status || 500,
-        message: error.message || 'Failed to fetch user data',
-        code: 'USER_FETCH_ERROR'
-      }
-    };
+  } catch (error) {
+    return handleApiError(error);
   }
 }
 
@@ -151,25 +71,22 @@ export async function fetchUser(token: string): Promise<AuthResult<User>> {
 export async function loginUser(email: string, password: string): Promise<AuthResult<{ user: User; tokens: TokenResponse }>> {
   try {
     // Backend expects username/password for login
-    const response = await apiRequest<TokenResponse>(
-      '/api/v1/auth/login', 
-      'POST', 
+    const response = await client.post<TokenResponse>(
+      '/api/v1/auth/login',
       {
         username: email, // Backend expects username, but we use email
         password,
       },
-      undefined,
-      'form-urlencoded' // Login uses form-urlencoded format
+      {
+        requiresAuth: false,
+        contentType: 'form' // Login uses form-urlencoded format
+      }
     );
 
     if (!response?.access_token) {
       return { 
         success: false, 
-        error: {
-          status: 401,
-          message: 'Authentication failed: No access token received',
-          code: 'AUTH_NO_TOKEN'
-        }
+        error: new ApiError(401, 'Authentication failed: No access token received', 'AUTH_NO_TOKEN')
       };
     }
 
@@ -203,17 +120,9 @@ export async function loginUser(email: string, password: string): Promise<AuthRe
         tokens: response
       }
     };
-  } catch (err) {
-    console.error('Login error:', err);
-    const error = err as ApiError;
-    return { 
-      success: false, 
-      error: {
-        status: error.status || 401,
-        message: error.message || 'Authentication failed',
-        code: 'AUTH_FAILED'
-      }
-    };
+  } catch (error) {
+    console.error('Login error:', error);
+    return handleApiError(error);
   }
 }
 
@@ -222,10 +131,8 @@ export async function loginUser(email: string, password: string): Promise<AuthRe
  */
 export async function registerUser(email: string, password: string, name?: string): Promise<AuthResult<{ message: string }>> {
   try {
-    // Use the same apiRequest approach as loginUser for consistency
-    const response = await apiRequest<{ message: string }>(
-      '/api/v1/auth/register', 
-      'POST', 
+    const response = await client.post<{ message: string }>(
+      '/api/v1/auth/register',
       {
         email,
         password,
@@ -233,22 +140,16 @@ export async function registerUser(email: string, password: string, name?: strin
         is_active: true,
         is_superuser: false
       },
-      undefined,
-      'json' // Explicitly use JSON format
+      {
+        requiresAuth: false,
+        contentType: 'json'
+      }
     );
     
     return { success: true, data: response };
-  } catch (err) {
-    console.error('Registration error:', err);
-    const error = err as ApiError;
-    return { 
-      success: false, 
-      error: {
-        status: error.status || 500,
-        message: error.message || 'Registration failed',
-        code: 'REGISTRATION_FAILED'
-      }
-    };
+  } catch (error) {
+    console.error('Registration error:', error);
+    return handleApiError(error);
   }
 }
 
@@ -258,13 +159,13 @@ export async function registerUser(email: string, password: string, name?: strin
 export async function logoutUser(): Promise<AuthResult<{ success: boolean }>> {
   try {
     // Call logout endpoint to revoke the refresh token
-    // The cookie will be included automatically with credentials: 'include'
-    await apiRequest<{ message: string }>(
-      '/api/v1/auth/logout', 
-      'POST', 
+    await client.post<{ message: string }>(
+      '/api/v1/auth/logout',
       {},
-      undefined,
-      'json'
+      {
+        requiresAuth: false, // Don't require auth as we might be logging out due to expired token
+        contentType: 'json'
+      }
     );
     
     // Clear stored tokens
@@ -281,8 +182,8 @@ export async function logoutUser(): Promise<AuthResult<{ success: boolean }>> {
       success: true, 
       data: { success: true } 
     };
-  } catch (err) {
-    console.error('Logout error:', err);
+  } catch (error) {
+    console.error('Logout error:', error);
     
     // Still clear tokens even if API call fails
     if (typeof window !== 'undefined') {
@@ -327,23 +228,19 @@ export function isTokenExpiringSoon(bufferMinutes = 5): boolean {
  */
 export async function refreshAccessToken(): Promise<AuthResult<TokenResponse>> {
   try {
-    // The refresh token is sent automatically via HttpOnly cookie
-    const response = await apiRequest<TokenResponse>(
-      '/api/v1/auth/refresh', 
-      'POST', 
+    const response = await client.post<TokenResponse>(
+      '/api/v1/auth/refresh',
       {},
-      undefined,
-      'json'
+      {
+        requiresAuth: false, // Refresh uses cookie, not authorization header
+        contentType: 'json'
+      }
     );
     
     if (!response || !response.access_token) {
       return { 
         success: false, 
-        error: {
-          status: 401,
-          message: 'Failed to refresh token',
-          code: 'REFRESH_FAILED'
-        }
+        error: new ApiError(401, 'Failed to refresh token', 'REFRESH_FAILED')
       };
     }
     
@@ -360,17 +257,9 @@ export async function refreshAccessToken(): Promise<AuthResult<TokenResponse>> {
     }
     
     return { success: true, data: response };
-  } catch (err) {
-    console.error('Token refresh error:', err);
-    const error = err as ApiError;
-    return { 
-      success: false, 
-      error: {
-        status: error.status || 401,
-        message: error.message || 'Failed to refresh token',
-        code: 'REFRESH_FAILED'
-      }
-    };
+  } catch (error) {
+    console.error('Token refresh error:', error);
+    return handleApiError(error);
   }
 }
 
@@ -379,14 +268,14 @@ export async function refreshAccessToken(): Promise<AuthResult<TokenResponse>> {
  */
 async function setRefreshTokenCookie(refreshToken: string): Promise<void> {
   try {
-    await fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL}/api/v1/auth/set-refresh-cookie`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({ refresh_token: refreshToken }),
-      credentials: 'include', // Important for cookies
-    });
+    await client.post(
+      '/api/v1/auth/set-refresh-cookie',
+      { refresh_token: refreshToken },
+      {
+        requiresAuth: false,
+        contentType: 'json'
+      }
+    );
   } catch (err) {
     console.error('Error setting refresh token cookie:', err);
     // Fallback to localStorage only if cookie setting fails
@@ -399,10 +288,14 @@ async function setRefreshTokenCookie(refreshToken: string): Promise<void> {
  */
 async function clearRefreshTokenCookie(): Promise<void> {
   try {
-    await fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL}/api/v1/auth/clear-refresh-cookie`, {
-      method: 'POST',
-      credentials: 'include',
-    });
+    await client.post(
+      '/api/v1/auth/clear-refresh-cookie',
+      {},
+      {
+        requiresAuth: false,
+        contentType: 'json'
+      }
+    );
     
     // Also clear any fallback in localStorage
     localStorage.removeItem('refresh_token');
@@ -451,56 +344,57 @@ export async function requestPasswordReset(email: string): Promise<AuthResult<Pa
   try {
     console.log('Requesting password reset for:', email);
 
-    const response = await apiRequest<PasswordResetRequest>(
-      '/api/v1/auth/forgot-password', 
-      'POST', 
+    const response = await client.post<PasswordResetRequest>(
+      '/api/v1/auth/forgot-password',
       {
         email: email.toLowerCase().trim(),
       },
-      undefined,
-      'json'
+      {
+        requiresAuth: false,
+        contentType: 'json'
+      }
     );
 
     return {
       success: true,
       data: response,
     };
-  } catch (err) {
-    console.error('Password reset request failed:', err);
+  } catch (error) {
+    console.error('Password reset request failed:', error);
     
-    const error = err as ApiError;
-    let message = 'Failed to send password reset email. Please try again.';
-    
-    // Handle specific error cases
-    if (error.status === 404) {
-      // For security, don't reveal if email exists or not
-      message = 'If an account with this email exists, you will receive password reset instructions.';
-    } else if (error.status === 429) {
-      message = 'Too many password reset requests. Please wait before trying again.';
-    } else if (error.status >= 500) {
-      message = 'Server error occurred. Please try again later.';
-    } else if (error.message) {
-      // Try to extract user-friendly message from API error
-      try {
-        const parsedError = JSON.parse(error.message);
-        if (parsedError.detail && typeof parsedError.detail === 'string') {
-          message = parsedError.detail;
-        }
-      } catch {
-        // If parsing fails, use the raw message if it's user-friendly
-        if (error.message.length < 200 && !error.message.includes('{')) {
-          message = error.message;
+    if (error instanceof ApiError) {
+      let message = 'Failed to send password reset email. Please try again.';
+      
+      // Handle specific error cases
+      if (error.status === 404) {
+        // For security, don't reveal if email exists or not
+        message = 'If an account with this email exists, you will receive password reset instructions.';
+      } else if (error.status === 429) {
+        message = 'Too many password reset requests. Please wait before trying again.';
+      } else if (error.status >= 500) {
+        message = 'Server error occurred. Please try again later.';
+      } else if (error.message) {
+        // Try to extract user-friendly message from API error
+        try {
+          const parsedError = JSON.parse(error.message);
+          if (parsedError.detail && typeof parsedError.detail === 'string') {
+            message = parsedError.detail;
+          }
+        } catch {
+          // If parsing fails, use the raw message if it's user-friendly
+          if (error.message.length < 200 && !error.message.includes('{')) {
+            message = error.message;
+          }
         }
       }
+
+      return {
+        success: false,
+        error: new ApiError(error.status, message, error.code),
+      };
     }
 
-    return {
-      success: false,
-      error: {
-        message,
-        status: error.status || 500,
-      },
-    };
+    return handleApiError(error);
   }
 }
 
@@ -511,65 +405,66 @@ export async function resetPassword(token: string, newPassword: string): Promise
   try {
     console.log('Resetting password with token');
 
-    const response = await apiRequest<{ message: string }>(
-      '/api/v1/auth/reset-password', 
-      'POST', 
+    const response = await client.post<{ message: string }>(
+      '/api/v1/auth/reset-password',
       {
         token: token.trim(),
         password: newPassword,
       },
-      undefined,
-      'json'
+      {
+        requiresAuth: false,
+        contentType: 'json'
+      }
     );
 
     return {
       success: true,
       data: response,
     };
-  } catch (err) {
-    console.error('Password reset failed:', err);
+  } catch (error) {
+    console.error('Password reset failed:', error);
     
-    const error = err as ApiError;
-    let message = 'Failed to reset password. Please try again.';
-    
-    // Handle specific error cases
-    if (error.status === 400) {
-      if (error.message.toLowerCase().includes('token')) {
-        message = 'Invalid or expired reset token. Please request a new password reset.';
-      } else if (error.message.toLowerCase().includes('password')) {
-        message = 'Password does not meet requirements. Please ensure it\'s at least 8 characters long.';
-      } else {
-        message = 'Invalid request. Please check your information and try again.';
-      }
-    } else if (error.status === 404) {
-      message = 'Reset token not found. Please request a new password reset.';
-    } else if (error.status === 410) {
-      message = 'Reset token has expired. Please request a new password reset.';
-    } else if (error.status === 429) {
-      message = 'Too many password reset attempts. Please wait before trying again.';
-    } else if (error.status >= 500) {
-      message = 'Server error occurred. Please try again later.';
-    } else if (error.message) {
-      // Try to extract user-friendly message from API error
-      try {
-        const parsedError = JSON.parse(error.message);
-        if (parsedError.detail && typeof parsedError.detail === 'string') {
-          message = parsedError.detail;
+    if (error instanceof ApiError) {
+      let message = 'Failed to reset password. Please try again.';
+      
+      // Handle specific error cases
+      if (error.status === 400) {
+        if (error.message.toLowerCase().includes('token')) {
+          message = 'Invalid or expired reset token. Please request a new password reset.';
+        } else if (error.message.toLowerCase().includes('password')) {
+          message = 'Password does not meet requirements. Please ensure it\'s at least 8 characters long.';
+        } else {
+          message = 'Invalid request. Please check your information and try again.';
         }
-      } catch {
-        // If parsing fails, use the raw message if it's user-friendly
-        if (error.message.length < 200 && !error.message.includes('{')) {
-          message = error.message;
+      } else if (error.status === 404) {
+        message = 'Reset token not found. Please request a new password reset.';
+      } else if (error.status === 410) {
+        message = 'Reset token has expired. Please request a new password reset.';
+      } else if (error.status === 429) {
+        message = 'Too many password reset attempts. Please wait before trying again.';
+      } else if (error.status >= 500) {
+        message = 'Server error occurred. Please try again later.';
+      } else if (error.message) {
+        // Try to extract user-friendly message from API error
+        try {
+          const parsedError = JSON.parse(error.message);
+          if (parsedError.detail && typeof parsedError.detail === 'string') {
+            message = parsedError.detail;
+          }
+        } catch {
+          // If parsing fails, use the raw message if it's user-friendly
+          if (error.message.length < 200 && !error.message.includes('{')) {
+            message = error.message;
+          }
         }
       }
+
+      return {
+        success: false,
+        error: new ApiError(error.status, message, error.code),
+      };
     }
 
-    return {
-      success: false,
-      error: {
-        message,
-        status: error.status || 500,
-      },
-    };
+    return handleApiError(error);
   }
 } 

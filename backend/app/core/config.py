@@ -14,6 +14,9 @@ class Settings(BaseSettings):
     OPENAI_API_KEY: str
     ASSISTANT_ID: str
     
+    # Environment Configuration
+    ENVIRONMENT: str = "development"  # development, staging, production
+    
     # CORS Configuration
     BACKEND_CORS_ORIGINS: List[str] = ["http://localhost:3000", "http://localhost:8080"]
 
@@ -44,6 +47,11 @@ class Settings(BaseSettings):
             return f"postgresql://{self.DB_USERNAME}:{self.DB_PASSWORD}@{self.DB_HOST}:{self.DB_PORT}/{self.DB_DATABASE}?sslmode={self.DB_SSLMODE}"
         else:
             return f"postgresql://{self.DB_USERNAME}:{self.DB_PASSWORD}@{self.DB_HOST}:{self.DB_PORT}/{self.DB_DATABASE}"
+
+    @property
+    def is_production(self) -> bool:
+        """Check if we're running in production environment"""
+        return self.ENVIRONMENT.lower() == "production"
 
     class Config:
         env_file = ".env"

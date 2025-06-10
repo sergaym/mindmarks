@@ -1,11 +1,11 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import { ContentPage, ContentPageMetadata, EditorContent } from '@/types/content';
-import { useContent } from '@/hooks/use-content';
+import dynamic from 'next/dynamic';
+import { ContentPageMetadata, EditorContent } from '@/types/content';
+import { useContentPage } from '@/hooks/use-content';
 import { ContentMetadataPanel } from '@/components/content/content-metadata-panel';
-import { ContentEditor } from '@/components/content/content-editor';
 import { ContentHeader } from '@/components/content/content-header';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Button } from '@/components/ui/button';
@@ -20,43 +20,37 @@ import {
 } from "@/components/ui/breadcrumb"
 import { useBreadcrumb } from '../../layout';
 
+// Dynamic import for heavy content editor
+const ContentEditor = dynamic(
+  () => import('@/components/content/content-editor').then(mod => ({ default: mod.ContentEditor })),
+  {
+    loading: () => (
+      <div className="space-y-4">
+        <Skeleton className="h-8 w-3/4" />
+        <Skeleton className="h-4 w-full" />
+        <Skeleton className="h-4 w-5/6" />
+        <Skeleton className="h-4 w-4/5" />
+      </div>
+    ),
+    ssr: false, // Editor is client-side only
+  }
+);
+
 export default function ContentPageView() {
   const params = useParams();
   const router = useRouter();
   const { setBreadcrumb } = useBreadcrumb();
-  const { getContentPage, updateContentPage } = useContent();
   const contentId = params.id as string;
   
-  const [contentPage, setContentPage] = useState<ContentPage | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
+  // Use the new useContentPage hook instead of useContent
+  const { 
+    contentPage, 
+    error, 
+    isLoading, 
+    updateContentPage 
+  } = useContentPage(contentId);
+  
   const [showMetadataPanel, setShowMetadataPanel] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
-  // Load content page data from unified store
-  useEffect(() => {
-    async function loadContentPage() {
-      if (!contentId) return;
-      
-      setIsLoading(true);
-      setError(null);
-      
-      try {
-        const page = await getContentPage(contentId);
-        if (page) {
-          setContentPage(page);
-        } else {
-          setError('Content not found');
-        }
-      } catch (error) {
-        console.error('Failed to load content page:', error);
-        setError('Failed to load content page');
-      } finally {
-        setIsLoading(false);
-      }
-    }
-
-    loadContentPage();
-  }, [contentId, getContentPage]);
 
   // Set breadcrumb when content is loaded
   useEffect(() => {
@@ -93,33 +87,39 @@ export default function ContentPageView() {
     }
   }, [contentPage, setBreadcrumb]);
 
-  // Save content changes
-  const handleContentChange = async (content: EditorContent[]) => {
+  // Save content changes with optimistic updates
+  const handleContentChange = useCallback(async (content: EditorContent[]) => {
     if (!contentPage) return;
     
     try {
-      const success = await updateContentPage(contentPage.id, { content });
-      if (success) {
-        setContentPage(prev => prev ? { ...prev, content, updatedAt: new Date() } : null);
+      console.log('[ContentPage] Saving content changes for:', contentPage.id);
+      const success = await updateContentPage({ content });
+      if (!success) {
+        console.error('[ContentPage] Failed to save content changes');
+      } else {
+        console.log('[ContentPage] Successfully saved content changes');
       }
     } catch (error) {
-      console.error('Failed to save content:', error);
+      console.error('[ContentPage] Error saving content:', error);
     }
-  };
+  }, [contentPage, updateContentPage]);
 
-  // Update metadata
-  const handleMetadataUpdate = async (metadata: Partial<ContentPageMetadata>) => {
+  // Update metadata with optimistic updates
+  const handleMetadataUpdate = useCallback(async (metadata: Partial<ContentPageMetadata>) => {
     if (!contentPage) return;
     
     try {
-      const success = await updateContentPage(contentPage.id, metadata);
-      if (success) {
-        setContentPage(prev => prev ? { ...prev, ...metadata, updatedAt: new Date() } : null);
+      console.log('[ContentPage] Updating metadata for:', contentPage.id, metadata);
+      const success = await updateContentPage(metadata);
+      if (!success) {
+        console.error('[ContentPage] Failed to update metadata');
+      } else {
+        console.log('[ContentPage] Successfully updated metadata');
       }
     } catch (error) {
-      console.error('Failed to update metadata:', error);
+      console.error('[ContentPage] Error updating metadata:', error);
     }
-  };
+  }, [contentPage, updateContentPage]);
 
   // Loading state
   if (isLoading) {

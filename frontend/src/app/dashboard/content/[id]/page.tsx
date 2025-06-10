@@ -87,33 +87,39 @@ export default function ContentPageView() {
     }
   }, [contentPage, setBreadcrumb]);
 
-  // Save content changes
-  const handleContentChange = async (content: EditorContent[]) => {
+  // Save content changes with optimistic updates
+  const handleContentChange = useCallback(async (content: EditorContent[]) => {
     if (!contentPage) return;
     
     try {
-      const success = await updateContentPage(contentPage.id, { content });
-      if (success) {
-        setContentPage(prev => prev ? { ...prev, content, updatedAt: new Date() } : null);
+      console.log('[ContentPage] Saving content changes for:', contentPage.id);
+      const success = await updateContentPage({ content });
+      if (!success) {
+        console.error('[ContentPage] Failed to save content changes');
+      } else {
+        console.log('[ContentPage] Successfully saved content changes');
       }
     } catch (error) {
-      console.error('Failed to save content:', error);
+      console.error('[ContentPage] Error saving content:', error);
     }
-  };
+  }, [contentPage, updateContentPage]);
 
-  // Update metadata
-  const handleMetadataUpdate = async (metadata: Partial<ContentPageMetadata>) => {
+  // Update metadata with optimistic updates
+  const handleMetadataUpdate = useCallback(async (metadata: Partial<ContentPageMetadata>) => {
     if (!contentPage) return;
     
     try {
-      const success = await updateContentPage(contentPage.id, metadata);
-      if (success) {
-        setContentPage(prev => prev ? { ...prev, ...metadata, updatedAt: new Date() } : null);
+      console.log('[ContentPage] Updating metadata for:', contentPage.id, metadata);
+      const success = await updateContentPage(metadata);
+      if (!success) {
+        console.error('[ContentPage] Failed to update metadata');
+      } else {
+        console.log('[ContentPage] Successfully updated metadata');
       }
     } catch (error) {
-      console.error('Failed to update metadata:', error);
+      console.error('[ContentPage] Error updating metadata:', error);
     }
-  };
+  }, [contentPage, updateContentPage]);
 
   // Loading state
   if (isLoading) {

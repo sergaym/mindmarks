@@ -64,7 +64,7 @@ export function useContent() {
 
     try {
       setIsRefreshing(true);
-      const contentItems = await fetchUserContent(user);
+      const contentItems = await fetchUserContent();
       
       // Update cache and state
       persistentCache.content = contentItems;
@@ -108,8 +108,8 @@ export function useContent() {
     setError(null);
 
     try {
-      console.log('[useContent] Fetching user content for user:', user.id);
-      const contentItems = await fetchUserContent(user);
+      console.log('[useContent] Fetching user content');
+      const contentItems = await fetchUserContent();
       
       // Update cache and state
       persistentCache.content = contentItems;
@@ -207,7 +207,7 @@ export function useContent() {
       };
 
       console.log('[useContent] Creating new content:', createRequest);
-      const result = await createContent(createRequest, user);
+      const result = await createContent(createRequest);
       
       // Replace optimistic item with real one
       const finalContent = optimisticContent.map(item => 
@@ -262,7 +262,7 @@ export function useContent() {
       }
 
       console.log('[useContent] Fetching content page for ID:', id);
-      const contentPage = await fetchContentById(id, user);
+      const contentPage = await fetchContentById(id);
       
       if (contentPage) {
         // Update cache
@@ -316,7 +316,7 @@ export function useContent() {
       });
 
       console.log('[useContent] Updating content page:', id, updateRequest);
-      const updatedPage = await updateContentApi(id, updateRequest, user);
+      const updatedPage = await updateContentApi(id, updateRequest);
       
       // Update cache
       persistentCache.pages.set(id, updatedPage);
@@ -369,7 +369,7 @@ export function useContent() {
                            item.column === 'done' ? 'completed' : 'in_progress';
           
           console.log('[useContent] Updating content status:', item.id, newStatus);
-          await updateContentApi(item.id, { status: newStatus }, user);
+          await updateContentApi(item.id, { status: newStatus });
         }
       });
 
@@ -399,7 +399,7 @@ export function useContent() {
     
     try {
       console.log('[useContent] Deleting content:', id);
-      await deleteContent(id, user);
+      await deleteContent(id);
       
       // Update local state
       const newContent = content.filter(item => item.id !== id);

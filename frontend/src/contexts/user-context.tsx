@@ -2,7 +2,7 @@
 
 import React, { createContext, useState, useEffect, ReactNode, useCallback, useRef } from 'react';
 import { User } from '@/types/content';
-import { apiClient, AuthenticationError, ApiError } from '@/lib/api/client';
+import { client, AuthenticationError, ApiError } from '@/lib/api/client';
 import { isTokenExpiringSoon, refreshAccessToken } from '@/lib/api/auth';
 
 // Context type definition
@@ -99,13 +99,12 @@ export function UserProvider({ children }: UserProviderProps) {
             hasInitializedRef.current = true;
             return;
           }
-        } catch (refreshError) {
+        } catch {
         }
       }
       
       // Fetch user data from the API
-      const response = await apiClient.get<ApiUser>('/api/v1/users/me');
-      const apiUserData = response.data;
+      const apiUserData = await client.get<ApiUser>('/api/v1/users/me');
       
       // Transform API response to match our User interface
       const userData: User = {

@@ -279,59 +279,119 @@ class ContentService:
             await self.db.rollback()
             logger.error(f"Unexpected error deleting content {content_id}: {str(e)}")
             raise
+
+    async def get_content_stats(self, user_id: UUID) -> ContentStats:
         """Get content statistics for a user"""
-        base_query = self.db.query(Content).filter(
-            or_(
-                Content.created_by_id == str(user_id),
-                Content.collaborators.any(ContentCollaborator.user_id == str(user_id))
+        try:
+            base_stmt = select(Content).where(
+                or_(
+                    Content.created_by_id == str(user_id),
+                    Content.collaborators.any(ContentCollaborator.user_id == str(user_id))
+                )
             )
-        )
 
-        # Total content
-        total_content = base_query.count()
+            # Total content
+            count_stmt = select(func.count(Content.id)).where(
+                or_(
+                    Content.created_by_id == str(user_id),
+                    Content.collaborators.any(ContentCollaborator.user_id == str(user_id))
+                )
+            )
+            result = await self.db.execute(count_stmt)
+            total_content = result.scalar()
 
-        # By status
-        by_status = {}
-        for status in ContentStatusEnum:
-            count = base_query.filter(Content.status == status.value).count()
-            by_status[status.value] = count
+            # By status
+            by_status = {}
+            for status in ContentStatusEnum:
+                status_stmt = select(func.count(Content.id)).where(
+                    and_(
+                        Content.status == status.value,
+                        or_(
+                            Content.created_by_id == str(user_id),
+                            Content.collaborators.any(ContentCollaborator.user_id == str(user_id))
+                        )
+                    )
+                )
+                result = await self.db.execute(status_stmt)
+                by_status[status.value] = result.scalar()
 
-        # By type
-        by_type = {}
-        for content_type in ContentTypeEnum:
-            count = base_query.filter(Content.type == content_type.value).count()
-            by_type[content_type.value] = count
+            # By type
+            by_type = {}
+            for content_type in ContentTypeEnum:
+                type_stmt = select(func.count(Content.id)).where(
+                    and_(
+                        Content.type == content_type.value,
+                        or_(
+                            Content.created_by_id == str(user_id),
+                            Content.collaborators.any(ContentCollaborator.user_id == str(user_id))
+                        )
+                    )
+                )
+                result = await self.db.execute(type_stmt)
+                by_type[content_type.value] = result.scalar()
 
-        # By priority
-        by_priority = {}
-        for priority in ContentPriorityEnum:
-            count = base_query.filter(Content.priority == priority.value).count()
-            by_priority[priority.value] = count
+            # By priority
+            by_priority = {}
+            for priority in ContentPriorityEnum:
+                priority_stmt = select(func.count(Content.id)).where(
+                    and_(
+                        Content.priority == priority.value,
+                        or_(
+                            Content.created_by_id == str(user_id),
+                            Content.collaborators.any(ContentCollaborator.user_id == str(user_id))
+                        )
+                    )
+                )
+                result = await self.db.execute(priority_stmt)
+                by_priority[priority.value] = result.scalar()
 
-        # Average progress
-        avg_progress = base_query.with_entities(func.avg(Content.progress)).scalar() or 0.0
+            # Average progress
+            avg_stmt = select(func.avg(Content.progress)).where(
+                or_(
+                    Content.created_by_id == str(user_id),
+                    Content.collaborators.any(ContentCollaborator.user_id == str(user_id))
+                )
+            )
+            result = await self.db.execute(avg_stmt)
+            avg_progress = result.scalar() or 0.0
 
-        # Completed this month
-        month_start = datetime.utcnow().replace(day=1, hour=0, minute=0, second=0, microsecond=0)
-        completed_this_month = base_query.filter(
-            Content.status == ContentStatusEnum.completed.value,
-            Content.updated_at >= month_start
-        ).count()
+            # Completed this month
+            month_start = datetime.utcnow().replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+            completed_stmt = select(func.count(Content.id)).where(
+                and_(
+                    Content.status == ContentStatusEnum.completed.value,
+                    Content.updated_at >= month_start,
+                    or_(
+                        Content.created_by_id == str(user_id),
+                        Content.collaborators.any(ContentCollaborator.user_id == str(user_id))
+                    )
+                )
+            )
+            result = await self.db.execute(completed_stmt)
+            completed_this_month = result.scalar()
 
-        # Reading streak (simplified - days with content activity)
-        reading_streak = self._calculate_reading_streak(user_id)
+            # Reading streak (simplified - days with content activity)
+            reading_streak = await self._calculate_reading_streak(user_id)
 
-        return ContentStats(
-            total_content=total_content,
-            by_status=by_status,
-            by_type=by_type,
-            by_priority=by_priority,
-            avg_progress=avg_progress,
-            completed_this_month=completed_this_month,
-            reading_streak=reading_streak
-        )
+            stats = ContentStats(
+                total_content=total_content,
+                by_status=by_status,
+                by_type=by_type,
+                by_priority=by_priority,
+                avg_progress=avg_progress,
+                completed_this_month=completed_this_month,
+                reading_streak=reading_streak
+            )
 
-    def _calculate_reading_streak(self, user_id: UUID) -> int:
+            logger.info(f"Generated content stats for user {user_id}")
+            return stats
+            
+        except SQLAlchemyError as e:
+            logger.error(f"Database error generating content stats for user {user_id}: {str(e)}")
+            raise
+        except Exception as e:
+            logger.error(f"Unexpected error generating content stats for user {user_id}: {str(e)}")
+            raise
         """Calculate reading streak (days with content updates)"""
         # Simplified implementation - count consecutive days with updates
         # This could be enhanced with more sophisticated logic

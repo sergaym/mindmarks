@@ -12,12 +12,11 @@ import {
   CreateContentRequest,
   UpdateContentRequest 
 } from '@/lib/api/content';
-import { fetchUser } from '@/lib/api/auth';
+import { useUser } from './use-user'; // Use existing UserContext instead of direct API calls
 
 // Persistent cache across component mounts for instant UX
 const persistentCache = {
   content: [] as ContentItem[],
-  user: null as User | null,
   lastFetch: 0,
   pages: new Map<string, ContentPage>(),
 };
@@ -26,51 +25,32 @@ const persistentCache = {
 const CACHE_TIMEOUT = 5 * 60 * 1000;
 
 /**
- * Integrates with backend API and handles authentication
+ * Integrates with backend API and uses existing UserContext for authentication
+ * No duplicate user API calls - reuses UserContext
  */
 export function useContent() {
+  // Use existing UserContext instead of managing user state separately
+  const { user: contextUser, isAuthenticated, isLoading: userLoading } = useUser();
+  
   // Initialize with cached data for instant display
   const [content, setContent] = useState<ContentItem[]>(persistentCache.content);
-  const [currentUser, setCurrentUser] = useState<User | null>(persistentCache.user);
   const [status, setStatus] = useState<Status>('idle');
   const [error, setError] = useState<string | null>(null);
   const [isRefreshing, setIsRefreshing] = useState(false);
 
-  // Get current user from session/auth with cache
-  const getCurrentUser = useCallback(async (): Promise<User | null> => {
-    if (persistentCache.user) return persistentCache.user;
-
-    try {
-      // Get access token from session storage
-      const accessToken = typeof window !== 'undefined' 
-        ? sessionStorage.getItem('access_token') 
-        : null;
-
-      if (!accessToken) {
-        throw new Error('No access token found');
-      }
-
-      const result = await fetchUser(accessToken);
-      if (result.success) {
-        // Transform auth User to content User format
-        const contentUser: User = {
-          id: result.data.id,
-          name: result.data.name || result.data.email.split('@')[0],
-          image: '/default-avatar.png', // Default image, can be enhanced later
-        };
-        // Cache user
-        persistentCache.user = contentUser;
-        setCurrentUser(contentUser);
-        return contentUser;
-      } else {
-        throw new Error(result.error.message);
-      }
-    } catch (error) {
-      console.error('Failed to fetch current user:', error);
-      setError('Authentication required. Please log in.');
+  // Convert UserContext user to Content user format
+  const getCurrentUser = useCallback((): User | null => {
+    if (!contextUser || !isAuthenticated) {
       return null;
     }
-  }, []);
+    
+    // Transform UserContext User to content User format
+    return {
+      id: contextUser.id,
+      name: contextUser.name,
+      image: contextUser.image,
+    };
+  }, [contextUser, isAuthenticated]);
 
   // Check if cache is fresh
   const isCacheFresh = useCallback(() => {

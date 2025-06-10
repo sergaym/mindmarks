@@ -197,39 +197,56 @@ class ContentService:
             await self.db.rollback()
             logger.error(f"Unexpected error creating content for user {user_id}: {str(e)}")
             raise
+
+    async def update_content(self, content_id: UUID, content_in: ContentUpdate, user_id: UUID) -> Optional[Content]:
         """Update content with access control"""
-        content = self._get_content_for_write(content_id, user_id)
-        if not content:
-            return None
+        try:
+            content = await self._get_content_for_write(content_id, user_id)
+            if not content:
+                logger.warning(f"Content {content_id} not found or no write access for user {user_id}")
+                return None
 
-        # Update fields
-        update_data = content_in.dict(exclude_unset=True)
-        
-        # Handle editor content serialization
-        if "content" in update_data and update_data["content"]:
-            update_data["content"] = [c.dict() if hasattr(c, 'dict') else c for c in update_data["content"]]
+            # Update fields
+            update_data = content_in.dict(exclude_unset=True)
+            
+            # Handle editor content serialization
+            if "content" in update_data and update_data["content"]:
+                update_data["content"] = [c.dict() if hasattr(c, 'dict') else c for c in update_data["content"]]
 
-        # Convert enum values to strings
-        if "type" in update_data:
-            update_data["type"] = update_data["type"].value
-        if "status" in update_data:
-            update_data["status"] = update_data["status"].value
-        if "priority" in update_data:
-            update_data["priority"] = update_data["priority"].value
+            # Convert enum values to strings
+            if "type" in update_data:
+                update_data["type"] = update_data["type"].value
+            if "status" in update_data:
+                update_data["status"] = update_data["status"].value
+            if "priority" in update_data:
+                update_data["priority"] = update_data["priority"].value
 
-        # Update last editor
-        update_data["last_edited_by_id"] = str(user_id)
-        update_data["updated_at"] = datetime.utcnow()
+            # Handle timezone conversion for published_date
+            if "published_date" in update_data:
+                update_data["published_date"] = self._convert_to_naive_datetime(update_data["published_date"])
 
-        for key, value in update_data.items():
-            if hasattr(content, key):
-                setattr(content, key, value)
+            # Update last editor
+            update_data["last_edited_by_id"] = str(user_id)
+            update_data["updated_at"] = datetime.utcnow()
 
-        self.db.commit()
-        self.db.refresh(content)
-        return content
+            for key, value in update_data.items():
+                if hasattr(content, key):
+                    setattr(content, key, value)
 
-    def delete_content(self, content_id: UUID, user_id: UUID) -> bool:
+            await self.db.commit()
+            await self.db.refresh(content)
+            
+            logger.info(f"Updated content {content_id} by user {user_id}")
+            return content
+
+        except SQLAlchemyError as e:
+            await self.db.rollback()
+            logger.error(f"Database error updating content {content_id}: {str(e)}")
+            raise
+        except Exception as e:
+            await self.db.rollback()
+            logger.error(f"Unexpected error updating content {content_id}: {str(e)}")
+            raise
         """Delete content with ownership check"""
         content = self.db.query(Content).filter(
             Content.id == str(content_id),

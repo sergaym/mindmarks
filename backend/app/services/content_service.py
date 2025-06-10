@@ -247,20 +247,38 @@ class ContentService:
             await self.db.rollback()
             logger.error(f"Unexpected error updating content {content_id}: {str(e)}")
             raise
+
+    async def delete_content(self, content_id: UUID, user_id: UUID) -> bool:
         """Delete content with ownership check"""
-        content = self.db.query(Content).filter(
-            Content.id == str(content_id),
-            Content.created_by_id == str(user_id)  # Only owner can delete
-        ).first()
+        try:
+            stmt = select(Content).where(
+                and_(
+                    Content.id == str(content_id),
+                    Content.created_by_id == str(user_id)  # Only owner can delete
+                )
+            )
+            
+            result = await self.db.execute(stmt)
+            content = result.scalar_one_or_none()
 
-        if not content:
-            return False
+            if not content:
+                logger.warning(f"Content {content_id} not found or not owned by user {user_id}")
+                return False
 
-        self.db.delete(content)
-        self.db.commit()
-        return True
+            await self.db.delete(content)
+            await self.db.commit()
+            
+            logger.info(f"Deleted content {content_id} by user {user_id}")
+            return True
 
-    def get_content_stats(self, user_id: UUID) -> ContentStats:
+        except SQLAlchemyError as e:
+            await self.db.rollback()
+            logger.error(f"Database error deleting content {content_id}: {str(e)}")
+            raise
+        except Exception as e:
+            await self.db.rollback()
+            logger.error(f"Unexpected error deleting content {content_id}: {str(e)}")
+            raise
         """Get content statistics for a user"""
         base_query = self.db.query(Content).filter(
             or_(

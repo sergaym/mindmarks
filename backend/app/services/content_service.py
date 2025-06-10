@@ -392,28 +392,159 @@ class ContentService:
         except Exception as e:
             logger.error(f"Unexpected error generating content stats for user {user_id}: {str(e)}")
             raise
+
+    async def _calculate_reading_streak(self, user_id: UUID) -> int:
         """Calculate reading streak (days with content updates)"""
-        # Simplified implementation - count consecutive days with updates
-        # This could be enhanced with more sophisticated logic
-        current_date = datetime.utcnow().date()
-        streak = 0
-        
-        for i in range(365):  # Check up to a year
-            check_date = current_date - timedelta(days=i)
+        try:
+            # Simplified implementation - count consecutive days with updates
+            # This could be enhanced with more sophisticated logic
+            current_date = datetime.utcnow().date()
+            streak = 0
             
-            # Check if user had any content activity on this date
-            activity = self.db.query(Content).filter(
-                or_(
-                    Content.created_by_id == str(user_id),
-                    Content.collaborators.any(ContentCollaborator.user_id == str(user_id))
-                ),
-                func.date(Content.updated_at) == check_date
-            ).first()
+            for i in range(365):  # Check up to a year
+                check_date = current_date - timedelta(days=i)
+                
+                # Check if user had any content activity on this date
+                activity_stmt = select(Content).where(
+                    and_(
+                        or_(
+                            Content.created_by_id == str(user_id),
+                            Content.collaborators.any(ContentCollaborator.user_id == str(user_id))
+                        ),
+                        func.date(Content.updated_at) == check_date
+                    )
+                ).limit(1)
+                
+                result = await self.db.execute(activity_stmt)
+                activity = result.scalar_one_or_none()
             
-            if activity:
-                streak += 1
-            elif i > 0:  # Don't break on first day if no activity today
-                break
+                if activity:
+                    streak += 1
+                elif i > 0:  # Don't break on first day if no activity today
+                    break
+            
+            return streak
+            
+        except SQLAlchemyError as e:
+            logger.error(f"Database error calculating reading streak for user {user_id}: {str(e)}")
+            return 0
+        except Exception as e:
+            logger.error(f"Unexpected error calculating reading streak for user {user_id}: {str(e)}")
+            return 0
+
+    async def _get_content_for_write(self, content_id: UUID, user_id: UUID) -> Optional[Content]:
+        """Get content with write access validation"""
+        try:
+            stmt = select(Content).where(
+                and_(
+                    Content.id == str(content_id),
+                    or_(
+                        Content.created_by_id == str(user_id),
+                        Content.collaborators.any(
+                            and_(
+                                ContentCollaborator.user_id == str(user_id),
+                                ContentCollaborator.can_edit == True
+                            )
+                        )
+                    )
+                )
+            )
+            
+            result = await self.db.execute(stmt)
+            return result.scalar_one_or_none()
+            
+        except SQLAlchemyError as e:
+            logger.error(f"Database error validating write access for content {content_id}: {str(e)}")
+            raise
+
+    def _get_default_content(self, content_type: str) -> List[Dict]:
+        """Generate default content structure based on type"""
+        defaults = {
+            "article": [
+                {"type": "heading", "content": "Article Title"},
+                {"type": "paragraph", "content": "Article summary..."}
+            ],
+            "video": [
+                {"type": "heading", "content": "Video Notes"},
+                {"type": "paragraph", "content": "Key points from the video..."}
+            ],
+            "book": [
+                {"type": "heading", "content": "Book Summary"},
+                {"type": "paragraph", "content": "Main insights..."}
+            ],
+            "podcast": [
+                {"type": "heading", "content": "Podcast Notes"},
+                {"type": "paragraph", "content": "Key takeaways..."}
+            ],
+            "course": [
+                {"type": "heading", "content": "Course Progress"},
+                {"type": "paragraph", "content": "Learning objectives..."}
+            ]
+        }
         
-        return streak
+        return defaults.get(content_type, [
+            {"type": "paragraph", "content": "Notes..."}
+        ])
+
+    @staticmethod
+    def content_to_list_item(content: Content) -> ContentListItem:
+        """Convert Content model to ContentListItem schema"""
+        return ContentListItem(
+            id=UUID(content.id),
+            name=content.title,  # title mapped to name
+            type=content.type,
+            start_at=content.created_at,  # created_at mapped to start_at
+            column=content.status,  # status mapped to column  
+            owner=UserBase(  # created_by mapped to owner
+                id=UUID(content.created_by.id),
+                name=content.created_by.full_name or content.created_by.email
+            ) if content.created_by else None,
+            description=content.summary,  # summary mapped to description
+            tags=content.tags or [],
+            url=content.url,
+            progress=content.progress,
+            priority=content.priority
+        )
+
+    @staticmethod
+    def content_to_read_schema(content: Content) -> ContentRead:
+        """Convert Content model to ContentRead schema"""
+        return ContentRead(
+            id=UUID(content.id),
+            title=content.title,
+            type=content.type,
+            url=content.url,
+            summary=content.summary,
+            tags=content.tags or [],
+            status=content.status,
+            priority=content.priority,
+            content=content.content or [],
+            key_takeaways=content.key_takeaways or [],
+            progress=content.progress,
+            created_at=content.created_at,
+            updated_at=content.updated_at,
+            author=content.author,
+            published_date=content.published_date,
+            estimated_read_time=content.estimated_read_time,
+            rating=content.rating,
+            is_public=content.is_public,
+            created_by=UserBase(
+                id=UUID(content.created_by.id),
+                name=content.created_by.full_name or content.created_by.email
+            ) if content.created_by else None,
+            last_edited_by=UserBase(
+                id=UUID(content.last_edited_by.id),
+                name=content.last_edited_by.full_name or content.last_edited_by.email
+            ) if content.last_edited_by else None,
+            collaborators=[
+                ContentCollaboratorBase(
+                    user=UserBase(
+                        id=UUID(collab.user.id),
+                        name=collab.user.full_name or collab.user.email
+                    ),
+                    can_edit=collab.can_edit,
+                    can_comment=collab.can_comment
+                ) for collab in content.collaborators
+            ] if content.collaborators else []
+        )
 

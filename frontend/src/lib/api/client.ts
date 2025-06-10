@@ -1,11 +1,12 @@
 /**
- * Enhanced API client with comprehensive error handling, retry logic, and token management
+ * Unified API client with comprehensive error handling, retry logic, and token management
+ * Consolidates all API request functionality across the application
  */
 import { refreshAccessToken, isTokenExpiringSoon } from './auth';
 
-const API_URL = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:8000'; 
+const API_URL = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:8000';
 
-// Error types for better error handling
+// Unified error types
 export class ApiError extends Error {
   constructor(
     public status: number,
@@ -32,30 +33,37 @@ export class AuthenticationError extends ApiError {
   }
 }
 
+// Content type mappings
+const CONTENT_TYPE_MAP = {
+  json: 'application/json',
+  form: 'application/x-www-form-urlencoded',
+  multipart: 'multipart/form-data',
+} as const;
+
 // Request configuration
-interface RequestConfig {
+export interface RequestConfig {
   method?: 'GET' | 'POST' | 'PUT' | 'DELETE' | 'PATCH';
   headers?: Record<string, string>;
   body?: unknown;
   timeout?: number;
   retries?: number;
   requiresAuth?: boolean;
-  contentType?: 'json' | 'form-urlencoded' | 'multipart';
+  contentType?: keyof typeof CONTENT_TYPE_MAP;
 }
 
 // Response wrapper
-interface ApiResponse<T = unknown> {
+export interface ApiResponse<T = unknown> {
   data: T;
   status: number;
   headers: Headers;
 }
 
-// Token management
+// Token management state
 let isRefreshing = false;
 let refreshSubscribers: Array<(token: string | null) => void> = [];
 
 /**
- * Get the current access token
+ * Get the current access token from storage
  */
 function getAccessToken(): string | null {
   if (typeof window === 'undefined') return null;
@@ -79,14 +87,14 @@ function getAuthHeaders(): Record<string, string> {
 }
 
 /**
- * Add request to refresh queue
+ * Subscribe to token refresh completion
  */
 function subscribeTokenRefresh(callback: (token: string | null) => void): void {
   refreshSubscribers.push(callback);
 }
 
 /**
- * Process refresh queue
+ * Notify all subscribers when token refresh completes
  */
 function onTokenRefreshed(token: string | null): void {
   refreshSubscribers.forEach(callback => callback(token));
@@ -94,7 +102,7 @@ function onTokenRefreshed(token: string | null): void {
 }
 
 /**
- * Handle token refresh with queue management
+ * Handle token refresh with queue management to prevent concurrent refreshes
  */
 async function handleTokenRefresh(): Promise<string | null> {
   if (isRefreshing) {
@@ -126,35 +134,31 @@ async function handleTokenRefresh(): Promise<string | null> {
 }
 
 /**
- * Create AbortController with timeout
- */
-function createTimeoutController(timeout: number): AbortController {
-  const controller = new AbortController();
-  setTimeout(() => controller.abort(), timeout);
-  return controller;
-}
-
-/**
  * Prepare request body based on content type
  */
-function prepareRequestBody(data: unknown, contentType: string): string | FormData {
+function prepareRequestBody(data: unknown, contentType: string): { body: string | FormData; headers: Record<string, string> } {
+  const headers: Record<string, string> = {};
+  
   switch (contentType) {
-    case 'application/json':
-      return JSON.stringify(data);
+    case CONTENT_TYPE_MAP.json:
+      headers['Content-Type'] = CONTENT_TYPE_MAP.json;
+      return { body: JSON.stringify(data), headers };
     
-    case 'application/x-www-form-urlencoded':
+    case CONTENT_TYPE_MAP.form:
+      headers['Content-Type'] = CONTENT_TYPE_MAP.form;
       if (data && typeof data === 'object') {
         const formData = new URLSearchParams();
         Object.entries(data as Record<string, unknown>).forEach(([key, value]) => {
           formData.append(key, String(value));
         });
-        return formData.toString();
+        return { body: formData.toString(), headers };
       }
-      return '';
+      return { body: '', headers };
     
-    case 'multipart/form-data':
+    case CONTENT_TYPE_MAP.multipart:
+      // Don't set Content-Type for multipart - let browser set it with boundary
       if (data instanceof FormData) {
-        return data;
+        return { body: data, headers };
       }
       if (data && typeof data === 'object') {
         const formData = new FormData();
@@ -163,24 +167,52 @@ function prepareRequestBody(data: unknown, contentType: string): string | FormDa
             formData.append(key, value);
           } else {
             formData.append(key, String(value));
-    }
+          }
         });
-        return formData;
+        return { body: formData, headers };
       }
-      return new FormData();
+      return { body: new FormData(), headers };
     
     default:
-      return JSON.stringify(data);
+      headers['Content-Type'] = CONTENT_TYPE_MAP.json;
+      return { body: JSON.stringify(data), headers };
   }
 }
 
 /**
- * Make API request with enhanced error handling and retry logic
+ * Parse API error response
  */
-async function makeRequest<T = unknown>(
+async function parseErrorResponse(response: Response): Promise<{ message: string; code?: string }> {
+  try {
+    const errorData = await response.json();
+    
+    // Handle different API error response formats
+    if (errorData.detail) {
+      // FastAPI format: {"detail": "message"}
+      return { message: errorData.detail };
+    } else if (errorData.message) {
+      // Custom format: {"message": "text", "code": "ERROR_CODE"}
+      return { message: errorData.message, code: errorData.code };
+    } else if (typeof errorData === 'string') {
+      return { message: errorData };
+    } else {
+      // Fallback for unknown JSON structure
+      return { message: JSON.stringify(errorData) };
+    }
+  } catch {
+    // If JSON parsing fails, use response text
+    const errorText = await response.text().catch(() => `HTTP ${response.status} Error`);
+    return { message: errorText };
+  }
+}
+
+/**
+ * Unified API request function that consolidates all request patterns
+ */
+async function apiRequest<T = unknown>(
   endpoint: string, 
   config: RequestConfig = {}
-): Promise<ApiResponse<T>> {
+): Promise<T> {
   const {
     method = 'GET',
     headers = {},
@@ -196,237 +228,153 @@ async function makeRequest<T = unknown>(
     try {
       await handleTokenRefresh();
     } catch (error) {
-      // If refresh fails, continue with the request - let the 401 handler deal with it
       console.warn('Proactive token refresh failed:', error);
-  }
+    }
   }
 
-  const url = `${API_URL}${endpoint}`;
+  const url = endpoint.startsWith('http') ? endpoint : `${API_URL}${endpoint}`;
   
-  // Prepare headers based on content type
-  const baseHeaders: Record<string, string> = {};
+  // Build headers
+  const requestHeaders: Record<string, string> = { ...headers };
   
-  if (contentType === 'json') {
-    baseHeaders['Content-Type'] = 'application/json';
-  } else if (contentType === 'form-urlencoded') {
-    baseHeaders['Content-Type'] = 'application/x-www-form-urlencoded';
+  // Add auth headers if required
+  if (requiresAuth) {
+    Object.assign(requestHeaders, getAuthHeaders());
   }
-  // For multipart, we let the browser set the boundary automatically
   
-  const requestHeaders: Record<string, string> = {
-    ...baseHeaders,
-    ...headers,
-    ...(requiresAuth ? getAuthHeaders() : {})
-  };
+  // Prepare body and content-type headers
+  let requestBody: string | FormData | undefined;
+  if (body && method !== 'GET') {
+    const { body: preparedBody, headers: contentHeaders } = prepareRequestBody(body, CONTENT_TYPE_MAP[contentType]);
+    requestBody = preparedBody;
+    Object.assign(requestHeaders, contentHeaders);
+  }
 
-  const requestBody = body ? prepareRequestBody(body, baseHeaders['Content-Type'] || 'application/json') : undefined;
+  // Create abort controller for timeout
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), timeout);
 
+  let lastError: Error = new Error('Unknown error');
+  
+  // Retry logic
   for (let attempt = 0; attempt <= retries; attempt++) {
-    const controller = createTimeoutController(timeout);
-    
     try {
+      console.log(`[API] ${method} ${url}${attempt > 0 ? ` (attempt ${attempt + 1})` : ''}`, body ? { body } : '');
+      
       const response = await fetch(url, {
         method,
         headers: requestHeaders,
         body: requestBody,
-        credentials: 'include',
-        signal: controller.signal
-    });
-    
+        signal: controller.signal,
+        credentials: 'include', // Include cookies for refresh tokens
+      });
+
+      clearTimeout(timeoutId);
+
       // Handle authentication errors
-      if (response.status === 401 && requiresAuth && attempt === 0) {
-        try {
-      const newToken = await handleTokenRefresh();
-      if (newToken) {
-            // Retry with new token
-            const newHeaders = { ...requestHeaders, ...getAuthHeaders() };
-            const retryResponse = await fetch(url, {
-              method,
-              headers: newHeaders,
-              body: requestBody,
-              credentials: 'include',
-              signal: createTimeoutController(timeout).signal
-            });
-            
-            if (!retryResponse.ok) {
-              let errorMessage: string;
-              let errorCode: string | undefined;
-
-              try {
-                // Try to parse JSON error response
-                const errorData = await retryResponse.json();
-                
-                // Handle different API error response formats
-                if (errorData.detail) {
-                  errorMessage = errorData.detail;
-                } else if (errorData.message) {
-                  errorMessage = errorData.message;
-                  errorCode = errorData.code;
-                } else if (typeof errorData === 'string') {
-                  errorMessage = errorData;
-      } else {
-                  errorMessage = JSON.stringify(errorData);
-      }
-              } catch {
-                try {
-                  errorMessage = await retryResponse.text() || `HTTP ${retryResponse.status} Error`;
-                } catch {
-                  errorMessage = `HTTP ${retryResponse.status} Error`;
-                }
-              }
-
-              throw new ApiError(
-                retryResponse.status,
-                errorMessage,
-                errorCode
-              );
-    }
-    
-            return {
-              data: await retryResponse.json(),
-              status: retryResponse.status,
-              headers: retryResponse.headers
-            };
+      if (response.status === 401 && requiresAuth) {
+        // Try to refresh token and retry once
+        if (attempt === 0) {
+          try {
+            await handleTokenRefresh();
+            // Update auth headers with new token
+            Object.assign(requestHeaders, getAuthHeaders());
+            continue; // Retry with new token
+          } catch {
+            throw new AuthenticationError('Authentication failed. Please log in again.');
           }
-        } catch {
-          // Clear invalid tokens and redirect to login
-          if (typeof window !== 'undefined') {
-            sessionStorage.removeItem('access_token');
-            localStorage.removeItem('access_token');
-            localStorage.removeItem('token_type');
-            window.location.href = '/login';
-          }
-          throw new AuthenticationError('Authentication failed', 'AUTH_FAILED');
+        } else {
+          throw new AuthenticationError('Authentication failed after token refresh.');
         }
       }
 
       // Handle other HTTP errors
       if (!response.ok) {
-        let errorMessage: string;
-        let errorCode: string | undefined;
-
-        try {
-          // Try to parse JSON error response
-          const errorData = await response.json();
-          
-          // Handle different API error response formats
-          if (errorData.detail) {
-            // FastAPI format: {"detail": "message"}
-            errorMessage = errorData.detail;
-          } else if (errorData.message) {
-            // Custom format: {"message": "text", "code": "ERROR_CODE"}
-            errorMessage = errorData.message;
-            errorCode = errorData.code;
-          } else if (typeof errorData === 'string') {
-            errorMessage = errorData;
-          } else {
-            // Fallback for unknown JSON structure
-            errorMessage = JSON.stringify(errorData);
-          }
-        } catch {
-          // If JSON parsing fails, use response text or generic message
-          try {
-            errorMessage = await response.text() || `HTTP ${response.status} Error`;
-          } catch {
-            errorMessage = `HTTP ${response.status} Error`;
-          }
-        }
-        
-        if (response.status >= 500 && attempt < retries) {
-          // Retry server errors
-          await new Promise(resolve => setTimeout(resolve, Math.pow(2, attempt) * 1000));
-          continue;
-        }
-        
-        throw new ApiError(response.status, errorMessage, errorCode);
+        const { message, code } = await parseErrorResponse(response);
+        throw new ApiError(response.status, message, code);
       }
 
-      // Parse response
-      const contentType = response.headers.get('content-type');
-      let data: T;
-      
-      if (contentType?.includes('application/json')) {
-        data = await response.json();
-      } else {
-        data = await response.text() as unknown as T;
+      // Handle successful responses
+      if (response.status === 204) {
+        console.log(`[API] ${method} ${url} - Success: No Content`);
+        return undefined as T;
       }
 
-      return {
-        data,
-        status: response.status,
-        headers: response.headers
-      };
+      const result = await response.json();
+      console.log(`[API] ${method} ${url} - Success:`, result);
+      return result as T;
 
     } catch (error) {
-      // Handle network errors and timeouts
-      if (error instanceof ApiError || error instanceof AuthenticationError) {
-        throw error;
-      }
+      clearTimeout(timeoutId);
       
-      if (error instanceof Error && error.name === 'AbortError') {
-        if (attempt < retries) {
-          await new Promise(resolve => setTimeout(resolve, Math.pow(2, attempt) * 1000));
-          continue;
-        }
-        throw new NetworkError('Request timeout', error);
+      if (controller.signal.aborted) {
+        lastError = new NetworkError('Request timeout');
+      } else if (error instanceof ApiError || error instanceof AuthenticationError) {
+        throw error; // Don't retry API errors
+      } else if (error instanceof TypeError && error.message.includes('fetch')) {
+        lastError = new NetworkError('Network error: Unable to connect to the server', error);
+      } else {
+        lastError = error as Error;
       }
-      
-      if (attempt < retries) {
-        await new Promise(resolve => setTimeout(resolve, Math.pow(2, attempt) * 1000));
-        continue;
+
+      // Don't retry on the last attempt
+      if (attempt === retries) {
+        break;
       }
-      
-      throw new NetworkError('Network request failed', error as Error);
+
+      // Exponential backoff
+      const delay = Math.min(1000 * Math.pow(2, attempt), 5000);
+      await new Promise(resolve => setTimeout(resolve, delay));
     }
   }
 
-  throw new NetworkError('Max retries exceeded');
-    }
-    
-// Convenience methods
-export const apiClient = {
+  console.error(`[API] ${method} ${url} - Failed after ${retries + 1} attempts:`, lastError);
+  throw lastError;
+}
+
+// Export the unified API client
+export const client = {
   /**
    * GET request
    */
   get: <T = unknown>(endpoint: string, config?: Omit<RequestConfig, 'method' | 'body'>) =>
-    makeRequest<T>(endpoint, { ...config, method: 'GET' }),
+    apiRequest<T>(endpoint, { ...config, method: 'GET' }),
 
   /**
    * POST request
    */
-  post: <T = unknown>(endpoint: string, data?: unknown, config?: Omit<RequestConfig, 'method'>) =>
-    makeRequest<T>(endpoint, { ...config, method: 'POST', body: data }),
+  post: <T = unknown>(endpoint: string, body?: unknown, config?: Omit<RequestConfig, 'method'>) =>
+    apiRequest<T>(endpoint, { ...config, method: 'POST', body }),
 
   /**
    * PUT request
    */
-  put: <T = unknown>(endpoint: string, data?: unknown, config?: Omit<RequestConfig, 'method'>) =>
-    makeRequest<T>(endpoint, { ...config, method: 'PUT', body: data }),
+  put: <T = unknown>(endpoint: string, body?: unknown, config?: Omit<RequestConfig, 'method'>) =>
+    apiRequest<T>(endpoint, { ...config, method: 'PUT', body }),
+
+  /**
+   * PATCH request
+   */
+  patch: <T = unknown>(endpoint: string, body?: unknown, config?: Omit<RequestConfig, 'method'>) =>
+    apiRequest<T>(endpoint, { ...config, method: 'PATCH', body }),
 
   /**
    * DELETE request
    */
   delete: <T = unknown>(endpoint: string, config?: Omit<RequestConfig, 'method' | 'body'>) =>
-    makeRequest<T>(endpoint, { ...config, method: 'DELETE' }),
-
-  /**
-   * PATCH request
-   */
-  patch: <T = unknown>(endpoint: string, data?: unknown, config?: Omit<RequestConfig, 'method'>) =>
-    makeRequest<T>(endpoint, { ...config, method: 'PATCH', body: data }),
+    apiRequest<T>(endpoint, { ...config, method: 'DELETE' }),
 };
 
-// Legacy exports for backward compatibility
-export const login = async (email: string, password: string) => {
-  const response = await apiClient.post('/api/v1/auth/login', {
-    username: email,
-    password,
-  }, { 
-    requiresAuth: false, 
-    contentType: 'form-urlencoded' 
-  });
-  
-  return response.data;
-};
+// Legacy support - expose the raw function for backward compatibility
+export { apiRequest };
 
-export default apiClient; 
+// Export the client as default
+export default client;
+
+// Export utility functions for testing
+export const __internal = {
+  getAccessToken,
+  getAuthHeaders,
+  parseErrorResponse,
+  prepareRequestBody,
+}; 

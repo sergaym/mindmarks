@@ -1,5 +1,5 @@
 from datetime import timedelta
-from fastapi import APIRouter, Depends, HTTPException, status, Body, BackgroundTasks
+from fastapi import APIRouter, Depends, HTTPException, status, Body, BackgroundTasks, Response, Request
 from fastapi.security import OAuth2PasswordRequestForm
 import logging
 
@@ -19,6 +19,10 @@ from app.db.async_base import AsyncDBSession
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
+
+# Cookie settings for refresh tokens
+REFRESH_TOKEN_COOKIE_NAME = "refresh_token"
+REFRESH_TOKEN_MAX_AGE = 60 * 60 * 24 * 7  # 7 days
 
 
 @router.post("/login", response_model=Token)
@@ -331,4 +335,204 @@ async def auth_health_check(session: AsyncDBSession):
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             detail="Authentication service unhealthy"
+        )
+
+
+@router.post("/set-refresh-cookie", status_code=status.HTTP_200_OK)
+async def set_refresh_token_cookie(
+    response: Response,
+    session: AsyncDBSession,
+    refresh_token: str = Body(..., embed=True)
+):
+    """
+    Set refresh token as HttpOnly cookie for secure storage
+    This endpoint is called by the frontend after login to store refresh tokens securely
+    """
+    user_svc = UserService(session)
+    
+    try:
+        # Validate the refresh token before setting it
+        payload = validate_refresh_token(refresh_token)
+        user_id = payload.get("sub")
+        
+        # Verify token exists in database
+        db_token = await user_svc.get_refresh_token(refresh_token)
+        if not db_token:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Invalid refresh token",
+            )
+        
+        # Verify user exists and is active
+        user = await user_svc.get_user_by_id(user_id)
+        if not user or not user.is_active:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Invalid or inactive user",
+            )
+        
+        # Set HttpOnly cookie with refresh token
+        response.set_cookie(
+            key=REFRESH_TOKEN_COOKIE_NAME,
+            value=refresh_token,
+            max_age=REFRESH_TOKEN_MAX_AGE,
+            httponly=True,  # Prevents XSS attacks
+            secure=settings.is_production,  # HTTPS only in production
+            samesite="strict",  # CSRF protection
+            path="/",  # Available for all routes
+        )
+        
+        logger.info(f"Refresh token cookie set for user: {user.email}")
+        return {"message": "Refresh token cookie set successfully"}
+        
+    except HTTPException as e:
+        raise e
+    except Exception as e:
+        logger.error(f"Error setting refresh token cookie: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Failed to set refresh token cookie"
+        )
+
+
+@router.post("/clear-refresh-cookie", status_code=status.HTTP_200_OK)
+async def clear_refresh_token_cookie(
+    response: Response,
+    request: Request,
+    session: AsyncDBSession
+):
+    """
+    Clear refresh token cookie and revoke token from database
+    This endpoint is called during logout to ensure proper cleanup
+    """
+    user_svc = UserService(session)
+    
+    try:
+        # Get refresh token from cookie
+        refresh_token = request.cookies.get(REFRESH_TOKEN_COOKIE_NAME)
+        
+        if refresh_token:
+            # Revoke the refresh token from database
+            await user_svc.revoke_refresh_token(refresh_token)
+            logger.info("Refresh token revoked from database")
+        
+        # Clear the cookie regardless of whether token was found
+        response.delete_cookie(
+            key=REFRESH_TOKEN_COOKIE_NAME,
+            path="/",
+            secure=settings.is_production,
+            samesite="strict"
+        )
+        
+        logger.info("Refresh token cookie cleared")
+        return {"message": "Refresh token cookie cleared successfully"}
+        
+    except Exception as e:
+        logger.error(f"Error clearing refresh token cookie: {e}")
+        # Still clear the cookie even if database operation fails
+        response.delete_cookie(
+            key=REFRESH_TOKEN_COOKIE_NAME,
+            path="/",
+            secure=settings.is_production,
+            samesite="strict"
+        )
+        return {"message": "Refresh token cookie cleared"}
+
+
+@router.post("/refresh-from-cookie", response_model=Token)
+async def refresh_access_token_from_cookie(
+    request: Request,
+    response: Response,
+    session: AsyncDBSession
+):
+    """
+    Get a new access token using refresh token from HttpOnly cookie
+    This provides an alternative to the body-based refresh endpoint
+    """
+    user_svc = UserService(session)
+    
+    # Get refresh token from cookie
+    refresh_token = request.cookies.get(REFRESH_TOKEN_COOKIE_NAME)
+    if not refresh_token:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Refresh token cookie not found",
+        )
+    
+    try:
+        # Validate the refresh token from JWT perspective
+        payload = validate_refresh_token(refresh_token)
+        user_id = payload.get("sub")
+        
+        # Verify token exists in database and is not revoked
+        db_token = await user_svc.get_refresh_token(refresh_token)
+        if not db_token:
+            # Clear invalid cookie
+            response.delete_cookie(
+                key=REFRESH_TOKEN_COOKIE_NAME,
+                path="/",
+                secure=settings.is_production,
+                samesite="strict"
+            )
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Invalid or revoked refresh token",
+            )
+        
+        # Verify user exists and is active
+        user = await user_svc.get_user_by_id(user_id)
+        if not user or not user.is_active:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Invalid user or inactive user",
+            )
+        
+        # Revoke the used refresh token (token rotation)
+        await user_svc.revoke_refresh_token(refresh_token)
+        
+        # Generate new access token
+        access_token_expires = timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
+        access_token = create_access_token(
+            subject=str(user.id), expires_delta=access_token_expires
+        )
+        
+        # Generate new refresh token
+        new_refresh_token = create_refresh_token(subject=str(user.id))
+        
+        # Store new refresh token in database
+        await user_svc.create_refresh_token(user.id, new_refresh_token)
+        
+        # Update the cookie with new refresh token
+        response.set_cookie(
+            key=REFRESH_TOKEN_COOKIE_NAME,
+            value=new_refresh_token,
+            max_age=REFRESH_TOKEN_MAX_AGE,
+            httponly=True,
+            secure=settings.is_production,
+            samesite="strict",
+            path="/",
+        )
+        
+        logger.info(f"Token refreshed from cookie successfully for user: {user.email}")
+        return {
+            "access_token": access_token,
+            "refresh_token": new_refresh_token,  # Also return in body for compatibility
+            "token_type": "bearer"
+        }
+    
+    except HTTPException as e:
+        raise e
+    except Exception as e:
+        logger.error(f"Refresh token from cookie error: {e}")
+        # Clear potentially invalid cookie
+        response.delete_cookie(
+            key=REFRESH_TOKEN_COOKIE_NAME,
+            path="/",
+            secure=settings.is_production,
+            samesite="strict"
+        )
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid refresh token",
+            headers={"WWW-Authenticate": "Bearer"},
         ) 

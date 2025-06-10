@@ -269,52 +269,8 @@ function getDefaultContent(type: ContentType): EditorContent[] {
  */
 export async function fetchUserContent(user: User): Promise<ContentItem[]> {
   try {
-    // For now, return mock data since backend endpoints may not be fully implemented
-    // In a real implementation, this would call: /api/v1/content/user/${user.id}
-    
-    const mockContentPages: ContentPage[] = [
-      {
-        id: '1',
-        title: 'Clean Code',
-        type: 'book',
-        tags: ['programming', 'best-practices'],
-        status: 'in-progress',
-        priority: 'high',
-        content: getDefaultContent('book'),
-        createdAt: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000),
-        updatedAt: new Date(),
-        createdBy: user,
-        lastEditedBy: user,
-        isPublic: false,
-        collaborators: [],
-        progress: 45,
-        author: 'Robert C. Martin',
-        estimatedReadTime: 480,
-      },
-      {
-        id: '2',
-        title: 'React Best Practices',
-        type: 'article',
-        url: 'https://example.com/react-best-practices',
-        tags: ['react', 'frontend'],
-        status: 'planned',
-        priority: 'medium',
-        content: getDefaultContent('article'),
-        createdAt: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000),
-        updatedAt: new Date(),
-        createdBy: user,
-        lastEditedBy: user,
-        isPublic: false,
-        collaborators: [],
-        estimatedReadTime: 15,
-      },
-    ];
-
-    return mockContentPages.map(contentPageToItem);
-    
-    // Real implementation would be:
-    // const response = await apiRequest<ContentPage[]>(`/api/v1/content/user/${user.id}`);
-    // return response.map(contentPageToItem);
+    const response = await apiRequest<BackendContentListItem[]>('/api/v1/content/me');
+    return response.map(backendContentToFrontend);
   } catch (error) {
     console.error('Error fetching user content:', error);
     throw error;
@@ -329,38 +285,24 @@ export async function createContent(
   user: User
 ): Promise<CreateContentResponse> {
   try {
-    // Create a mock response for now
-    const id = Date.now().toString();
-    const now = new Date();
-    
-    const contentPage: ContentPage = {
-      id,
+    // Transform frontend request to backend format
+    const backendRequest = {
       title: request.title,
       type: request.type,
       url: request.url,
+      description: request.description,
       tags: request.tags || [],
       status: request.status,
       priority: request.priority,
       content: getDefaultContent(request.type),
-      summary: request.description,
-      createdAt: now,
-      updatedAt: now,
-      createdBy: user,
-      lastEditedBy: user,
-      isPublic: false,
-      collaborators: [],
     };
 
-    const contentItem = contentPageToItem(contentPage);
-
-    // Real implementation would be:
-    // const response = await apiRequest<CreateContentResponse>('/api/v1/content', 'POST', request);
-    // return response;
-
+    const response = await apiRequest<BackendContentResponse>('/api/v1/content', 'POST', backendRequest);
+    
     return {
-      id,
-      content: contentItem,
-      contentPage,
+      id: response.id,
+      content: backendContentToFrontend(response.content),
+      contentPage: backendContentPageToFrontend(response.content_page),
     };
   } catch (error) {
     console.error('Error creating content:', error);
@@ -373,27 +315,8 @@ export async function createContent(
  */
 export async function fetchContentById(id: string, user: User): Promise<ContentPage | null> {
   try {
-    // Mock implementation
-    const mockPage: ContentPage = {
-      id,
-      title: 'Sample Content',
-      type: 'article',
-      tags: ['sample'],
-      status: 'planned',
-      priority: 'medium',
-      content: getDefaultContent('article'),
-      createdAt: new Date(),
-      updatedAt: new Date(),
-      createdBy: user,
-      lastEditedBy: user,
-      isPublic: false,
-      collaborators: [],
-    };
-
-    return mockPage;
-
-    // Real implementation would be:
-    // return await apiRequest<ContentPage>(`/api/v1/content/${id}`);
+    const response = await apiRequest<BackendContentRead>(`/api/v1/content/${id}`);
+    return backendContentPageToFrontend(response);
   } catch (error) {
     if (error instanceof ContentApiError && error.status === 404) {
       return null;
@@ -412,36 +335,28 @@ export async function updateContent(
   user: User
 ): Promise<ContentPage> {
   try {
-    // Mock implementation
-    const now = new Date();
-    const updatedPage: ContentPage = {
-      id,
-      title: request.title || 'Updated Content',
-      type: request.type || 'article',
-      url: request.url,
-      tags: request.tags || [],
-      status: request.status || 'planned',
-      priority: request.priority || 'medium',
-      content: request.content || getDefaultContent(request.type || 'article'),
-      summary: request.summary,
-      keyTakeaways: request.keyTakeaways,
-      author: request.author,
-      publishedDate: request.publishedDate,
-      estimatedReadTime: request.estimatedReadTime,
-      rating: request.rating,
-      progress: request.progress,
-      createdAt: new Date(Date.now() - 24 * 60 * 60 * 1000), // Yesterday
-      updatedAt: now,
-      createdBy: user,
-      lastEditedBy: user,
-      isPublic: request.isPublic || false,
-      collaborators: [],
-    };
+    // Transform frontend request to backend format
+    const backendRequest: any = {};
+    
+    if (request.title !== undefined) backendRequest.title = request.title;
+    if (request.type !== undefined) backendRequest.type = request.type;
+    if (request.url !== undefined) backendRequest.url = request.url;
+    if (request.description !== undefined) backendRequest.description = request.description;
+    if (request.tags !== undefined) backendRequest.tags = request.tags;
+    if (request.status !== undefined) backendRequest.status = request.status;
+    if (request.priority !== undefined) backendRequest.priority = request.priority;
+    if (request.content !== undefined) backendRequest.content = request.content;
+    if (request.summary !== undefined) backendRequest.summary = request.summary;
+    if (request.keyTakeaways !== undefined) backendRequest.key_takeaways = request.keyTakeaways;
+    if (request.author !== undefined) backendRequest.author = request.author;
+    if (request.publishedDate !== undefined) backendRequest.published_date = request.publishedDate.toISOString();
+    if (request.estimatedReadTime !== undefined) backendRequest.estimated_read_time = request.estimatedReadTime;
+    if (request.rating !== undefined) backendRequest.rating = request.rating;
+    if (request.progress !== undefined) backendRequest.progress = request.progress;
+    if (request.isPublic !== undefined) backendRequest.is_public = request.isPublic;
 
-    return updatedPage;
-
-    // Real implementation would be:
-    // return await apiRequest<ContentPage>(`/api/v1/content/${id}`, 'PUT', request);
+    const response = await apiRequest<BackendContentRead>(`/api/v1/content/${id}`, 'PATCH', backendRequest);
+    return backendContentPageToFrontend(response);
   } catch (error) {
     console.error('Error updating content:', error);
     throw error;
@@ -453,11 +368,7 @@ export async function updateContent(
  */
 export async function deleteContent(id: string, user: User): Promise<void> {
   try {
-    // Mock implementation - just return success
-    console.log(`Deleting content ${id} for user ${user.id}`);
-
-    // Real implementation would be:
-    // await apiRequest(`/api/v1/content/${id}`, 'DELETE');
+    await apiRequest<void>(`/api/v1/content/${id}`, 'DELETE');
   } catch (error) {
     console.error('Error deleting content:', error);
     throw error;

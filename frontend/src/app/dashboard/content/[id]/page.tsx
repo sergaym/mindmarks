@@ -40,39 +40,17 @@ export default function ContentPageView() {
   const params = useParams();
   const router = useRouter();
   const { setBreadcrumb } = useBreadcrumb();
-  const { getContentPage, updateContentPage } = useContent();
   const contentId = params.id as string;
   
-  const [contentPage, setContentPage] = useState<ContentPage | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
+  // Use the new useContentPage hook instead of useContent
+  const { 
+    contentPage, 
+    error, 
+    isLoading, 
+    updateContentPage 
+  } = useContentPage(contentId);
+  
   const [showMetadataPanel, setShowMetadataPanel] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
-  // Load content page data from unified store
-  useEffect(() => {
-    async function loadContentPage() {
-      if (!contentId) return;
-      
-      setIsLoading(true);
-      setError(null);
-      
-      try {
-        const page = await getContentPage(contentId);
-        if (page) {
-          setContentPage(page);
-        } else {
-          setError('Content not found');
-        }
-      } catch (error) {
-        console.error('Failed to load content page:', error);
-        setError('Failed to load content page');
-      } finally {
-        setIsLoading(false);
-      }
-    }
-
-    loadContentPage();
-  }, [contentId, getContentPage]);
 
   // Set breadcrumb when content is loaded
   useEffect(() => {

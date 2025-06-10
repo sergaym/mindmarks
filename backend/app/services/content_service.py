@@ -71,60 +71,76 @@ class ContentService:
         except Exception as e:
             logger.error(f"Unexpected error retrieving content {content_id}: {str(e)}")
             raise
-        """Get all content accessible by a user with optional filtering"""
-        query = self.db.query(Content).options(
-            joinedload(Content.created_by),
-            joinedload(Content.last_edited_by),
-            joinedload(Content.collaborators).joinedload(ContentCollaborator.user)
-        ).filter(
-            or_(
-                Content.created_by_id == str(user_id),
-                Content.collaborators.any(ContentCollaborator.user_id == str(user_id))
-            )
-        )
 
-        # Apply filters if provided
-        if filters:
-            if filters.query:
-                search_pattern = f"%{filters.query}%"
-                query = query.filter(
+    async def get_user_content(self, user_id: UUID, filters: Optional[ContentSearchFilters] = None) -> List[Content]:
+        """Get all content accessible by a user with optional filtering"""
+        try:
+            stmt = (
+                select(Content)
+                .options(
+                    selectinload(Content.created_by),
+                    selectinload(Content.last_edited_by),
+                    selectinload(Content.collaborators).selectinload(ContentCollaborator.user)
+                )
+                .where(
                     or_(
-                        Content.title.ilike(search_pattern),
-                        Content.summary.ilike(search_pattern),
-                        Content.author.ilike(search_pattern)
+                        Content.created_by_id == str(user_id),
+                        Content.collaborators.any(ContentCollaborator.user_id == str(user_id))
                     )
                 )
-            
-            if filters.types:
-                query = query.filter(Content.type.in_([t.value for t in filters.types]))
-            
-            if filters.statuses:
-                query = query.filter(Content.status.in_([s.value for s in filters.statuses]))
-            
-            if filters.priorities:
-                query = query.filter(Content.priority.in_([p.value for p in filters.priorities]))
-            
-            if filters.tags:
-                # PostgreSQL JSONB contains operation for tag filtering
-                for tag in filters.tags:
-                    query = query.filter(Content.tags.contains([tag]))
-            
-            if filters.created_after:
-                query = query.filter(Content.created_at >= filters.created_after)
-            
-            if filters.created_before:
-                query = query.filter(Content.created_at <= filters.created_before)
+            )
 
-        # Order by updated_at desc for most recent first
-        query = query.order_by(Content.updated_at.desc())
+            # Apply filters if provided
+            if filters:
+                if filters.query:
+                    search_pattern = f"%{filters.query}%"
+                    stmt = stmt.where(
+                        or_(
+                            Content.title.ilike(search_pattern),
+                            Content.summary.ilike(search_pattern),
+                            Content.author.ilike(search_pattern)
+                        )
+                    )
+                
+                if filters.types:
+                    stmt = stmt.where(Content.type.in_([t.value for t in filters.types]))
+                
+                if filters.statuses:
+                    stmt = stmt.where(Content.status.in_([s.value for s in filters.statuses]))
+                
+                if filters.priorities:
+                    stmt = stmt.where(Content.priority.in_([p.value for p in filters.priorities]))
+                
+                if filters.tags:
+                    # PostgreSQL JSONB contains operation for tag filtering
+                    for tag in filters.tags:
+                        stmt = stmt.where(Content.tags.contains([tag]))
+                
+                if filters.created_after:
+                    stmt = stmt.where(Content.created_at >= filters.created_after)
+                
+                if filters.created_before:
+                    stmt = stmt.where(Content.created_at <= filters.created_before)
 
-        # Apply pagination if filters provided
-        if filters:
-            query = query.offset(filters.skip).limit(filters.limit)
+            # Order by updated_at desc for most recent first
+            stmt = stmt.order_by(Content.updated_at.desc())
 
-        return query.all()
+            # Apply pagination if filters provided
+            if filters:
+                stmt = stmt.offset(filters.skip).limit(filters.limit)
 
-    def create_content(self, content_in: ContentCreate, user_id: UUID) -> Content:
+            result = await self.db.execute(stmt)
+            content_list = result.unique().scalars().all()
+            
+            logger.info(f"Retrieved {len(content_list)} content items for user {user_id}")
+            return list(content_list)
+            
+        except SQLAlchemyError as e:
+            logger.error(f"Database error retrieving user content for {user_id}: {str(e)}")
+            raise
+        except Exception as e:
+            logger.error(f"Unexpected error retrieving user content for {user_id}: {str(e)}")
+            raise
         """Create new content"""
         # Generate default content based on type if not provided
         if not content_in.content:

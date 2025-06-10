@@ -141,43 +141,62 @@ class ContentService:
         except Exception as e:
             logger.error(f"Unexpected error retrieving user content for {user_id}: {str(e)}")
             raise
+
+    async def create_content(self, content_in: ContentCreate, user_id: UUID) -> Optional[Content]:
         """Create new content"""
-        # Generate default content based on type if not provided
-        if not content_in.content:
-            default_content = self._get_default_content(content_in.type.value)
-        else:
-            default_content = [c.dict() for c in content_in.content]
+        try:
+            # Generate default content based on type if not provided
+            if not content_in.content:
+                default_content = self._get_default_content(content_in.type.value)
+            else:
+                default_content = [c.dict() for c in content_in.content]
 
-        content = Content(
-            id=str(uuid.uuid4()),
-            title=content_in.title,
-            type=content_in.type.value,
-            url=content_in.url,
-            summary=content_in.summary,
-            tags=content_in.tags,
-            status=content_in.status.value,
-            priority=content_in.priority.value,
-            content=default_content,
-            key_takeaways=content_in.key_takeaways,
-            author=content_in.author,
-            published_date=content_in.published_date,
-            estimated_read_time=content_in.estimated_read_time,
-            rating=content_in.rating,
-            progress=content_in.progress,
-            is_public=content_in.is_public,
-            created_by_id=str(user_id),
-            last_edited_by_id=str(user_id)
-        )
+            # Convert timezone-aware datetime to naive for database storage
+            published_date = self._convert_to_naive_datetime(content_in.published_date)
 
-        self.db.add(content)
-        self.db.commit()
-        self.db.refresh(content)
+            content = Content(
+                id=str(uuid.uuid4()),
+                title=content_in.title,
+                type=content_in.type.value,
+                url=content_in.url,
+                summary=content_in.summary,
+                tags=content_in.tags,
+                status=content_in.status.value,
+                priority=content_in.priority.value,
+                content=default_content,
+                key_takeaways=content_in.key_takeaways,
+                author=content_in.author,
+                published_date=published_date,
+                estimated_read_time=content_in.estimated_read_time,
+                rating=content_in.rating,
+                progress=content_in.progress,
+                is_public=content_in.is_public,
+                created_by_id=str(user_id),
+                last_edited_by_id=str(user_id)
+            )
+
+            self.db.add(content)
+            await self.db.commit()
+            await self.db.refresh(content)
         
-        # Load relationships
-        content = self.get_content_by_id(UUID(content.id), user_id)
-        return content
-
-    def update_content(self, content_id: UUID, content_in: ContentUpdate, user_id: UUID) -> Optional[Content]:
+            # Load relationships
+            created_content = await self.get_content_by_id(UUID(content.id), user_id)
+            
+            logger.info(f"Created content {content.id} for user {user_id}")
+            return created_content
+            
+        except IntegrityError as e:
+            await self.db.rollback()
+            logger.error(f"Integrity error creating content for user {user_id}: {str(e)}")
+            raise
+        except SQLAlchemyError as e:
+            await self.db.rollback()
+            logger.error(f"Database error creating content for user {user_id}: {str(e)}")
+            raise
+        except Exception as e:
+            await self.db.rollback()
+            logger.error(f"Unexpected error creating content for user {user_id}: {str(e)}")
+            raise
         """Update content with access control"""
         content = self._get_content_for_write(content_id, user_id)
         if not content:
